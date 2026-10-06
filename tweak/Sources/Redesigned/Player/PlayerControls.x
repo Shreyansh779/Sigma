@@ -3,7 +3,7 @@
 // bar seeks there.
 //
 // The glyphs are drawn over Spotify's controls rather than instead of them: each button keeps its
-// action, its enabled state, its accessibility and the Gestures zones around it, and the glyph takes no
+// action, its enabled state, its accessibility, and the glyph takes no
 // touches. Previous and next get theirs inside the button's content view, so the button's own press
 // and disabled look carry over; Spotify's icon under it goes transparent on every pass (SPTEncoreIconView
 // is a Swift class, which SGRSuppress cannot keep). Play loses its white disc, a plain UIImageView the
