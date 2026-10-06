@@ -14,7 +14,9 @@ APP_DIR="$(unzip -Z1 "$OUT" | grep -oE '^Payload/[^/]+\.app/' | sort -u | head -
 
 skip() { echo "    $1: the launch screen is left as Spotify's"; exit 0; }
 xcrun --find ibtool >/dev/null 2>&1 || skip "no ibtool"
-unzip -Z1 "$OUT" | grep -q "^${APP_DIR}LaunchScreen.storyboardc/" || skip "no LaunchScreen.storyboardc in this IPA"
+# The listing goes to a variable first: grep -q ends early and, with pipefail, would fail the pipe.
+LISTING="$(unzip -Z1 "$OUT")"
+grep -q "^${APP_DIR}LaunchScreen.storyboardc/" <<<"$LISTING" || skip "no LaunchScreen.storyboardc in this IPA"
 
 WORK="$(mktemp -d)"
 trap 'rm -rf "$WORK"' EXIT
