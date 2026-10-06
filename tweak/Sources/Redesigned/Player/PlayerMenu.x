@@ -15,6 +15,7 @@
 #import <objc/message.h>
 #import <objc/runtime.h>
 #import "Core/SGCore.h"
+#import "Diagnostics/SGHangSampler.h"
 #import "Redesigned/Kit/SGRKit.h"
 #import "Shared/Player/SpeedPitch.h"
 #import "Player.h"
@@ -89,6 +90,13 @@ static UIImage *symbol(NSString *name) {
 @end
 
 @implementation SGRPlayerMoreTapWatcher
+// The finger goes down on the ⋯: when it did is in the log, and for the few seconds the menu takes to come up a
+// stall of the main thread is sampled (Diagnostics/SGHangSampler.h), so a slow ⋯ says what held it.
+- (void)touchedDown:(UILongPressGestureRecognizer *)press {
+    if (press.state != UIGestureRecognizerStateBegan) return;
+    SGLog(@"redesign player menu: the ⋯ was touched");
+    SGHangSamplerStart(@"player menu", 4);
+}
 - (void)tapped:(id)sender {
     UIView *button = [sender isKindOfClass:UIGestureRecognizer.class] ? ((UIGestureRecognizer *)sender).view : sender;
     sgr_moreButton = button;
@@ -114,6 +122,13 @@ void SGRPlayerMenuWatchMoreButton(UIView *button) {
     tap.delaysTouchesEnded = NO;
     tap.delegate = watcher;
     [button addGestureRecognizer:tap];
+    UILongPressGestureRecognizer *down = [[UILongPressGestureRecognizer alloc] initWithTarget:watcher action:@selector(touchedDown:)];
+    down.minimumPressDuration = 0;
+    down.cancelsTouchesInView = NO;
+    down.delaysTouchesBegan = NO;
+    down.delaysTouchesEnded = NO;
+    down.delegate = watcher;
+    [button addGestureRecognizer:down];
 }
 
 #pragma mark - Spotify's rows, read
