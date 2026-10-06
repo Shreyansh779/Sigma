@@ -70,6 +70,7 @@ A feature is a directory in its layer holding everything about one area of the a
 Shared:
 
     Privacy/      telemetry blocking and its counters, and the Search switches that force their flags off (Clutter.m)
+    Splash/       the app icon in use over Spotify's start-up, until Home appears or 4 s: the launch screen iOS draws first is one picture for every icon, so scripts/launch-screen.sh makes it plain and Splash.x draws the icon (the 60 pt picture app-icons.sh puts in the IPA)
     ArtistBlock/  tracks by blocked artists skipped as they start (ArtistSkip.x), the list and the Blocked artists page under Player
     Flags/        Spotify's remote-config flags: the provider hook, the generated table, the All flags page
     Gestures/     the double tap zones on the player: the grid, what each cell does, the recognizer (each look hooks it on)
