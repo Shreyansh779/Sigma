@@ -11,3 +11,6 @@
 NSInteger SGAppIconThemeRGB(void);
 // The list's file name of the icon in use (App/About/AppIcon.m): "Pink", "Blue"...
 void SGAppIconRemember(NSString *file);
+// The one remembered, nil before any: UIApplication's alternateIconName can read nil early in a launch, or
+// for an app run inside another (LiveContainer), where this is what the icon was when last looked at.
+NSString *SGAppIconRemembered(void);
