@@ -519,6 +519,8 @@ static __weak UIScrollView *sg_pageScroll;
 // appearance pass on the page do not do it), so the selection goes to another tab and back, unseen.
 static BOOL sg_flipping;
 static void searchPageScroll(void);
+static void keepSearching(NSUInteger tries);
+static BOOL sg_searching;
 
 // The page and list UIKit has been made to read. A page named before the controller was on screen or had
 // its tabs (the first launch) is named but not read, and naming it again does nothing, so it is the
@@ -819,7 +821,10 @@ static void syncInline(UIView *stockBar) API_AVAILABLE(ios(26.0)) {
         SGLog(@"tab bar: selection follows Spotify to %@", selected.title);
         tabs.selectedTab = selected;
     }
-    if (!sg_pageScroll.window) searchPageScroll();
+    if (!sg_pageScroll.window && !sg_searching) {
+        sg_searching = YES;
+        keepSearching(30);
+    }
     static NSUInteger retries;
     if (missing && retries++ < 40) {
         dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.25 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
@@ -880,6 +885,20 @@ static void searchPageScroll(void) {
     }
     static NSUInteger logged;
     if (!sg_pageScroll.window && logged++ < 5) SGLog(@"tab bar: no page list found to minimize by (%lu looked at)", (unsigned long)found);
+}
+
+// At a cold start the first search can come before Home's list has its size, and nothing asks again until
+// a page is dragged or comes on screen anew (opening and closing the player does it), so the bar never
+// minimized. The search is repeated, a little over a second apart, until a list is found.
+static void keepSearching(NSUInteger tries) {
+    if (sg_pageScroll.window || !tries) {
+        sg_searching = NO;
+        return;
+    }
+    searchPageScroll();
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(1.1 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+        keepSearching(tries - 1);
+    });
 }
 
 @interface SGRScrollDrag : NSObject
