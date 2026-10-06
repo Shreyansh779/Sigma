@@ -126,7 +126,7 @@ echo "==> adding the alternate app icons"
 "$ROOT/scripts/app-icons.sh" "$OUT" || echo "    the app icons failed: building without them"
 
 echo "==> making the launch screen plain"
-# The mod shows the icon in use over the start-up itself (Shared/Splash); a failure leaves Spotify's launch screen.
+# A failure leaves Spotify's launch screen.
 "$ROOT/scripts/launch-screen.sh" "$OUT" || echo "    the launch screen failed: left as Spotify's"
 
 echo "==> done: $OUT"

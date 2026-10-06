@@ -70,10 +70,7 @@ A feature is a directory in its layer holding everything about one area of the a
 Shared:
 
     Privacy/      telemetry blocking and its counters, and the Search switches that force their flags off (Clutter.m)
-    Splash/       the app icon in use over Spotify's start-up, until Home appears or 4 s: the launch screen iOS draws first is one picture for every icon, so scripts/launch-screen.sh makes it plain and Splash.x draws the icon (the 60 pt picture app-icons.sh puts in the IPA)
-    ArtistBlock/  tracks by blocked artists skipped as they start (ArtistSkip.x), the list and the Blocked artists page under Player
     Flags/        Spotify's remote-config flags: the provider hook, the generated table, the All flags page
-    Gestures/     the double tap zones on the player: the grid, what each cell does, the recognizer (each look hooks it on)
     Lyrics/       the lyrics engine for the redesign's Apple Music style lyrics and the lock screen: lines read from
                   color-lyrics and the player's clock (KaraokeSource.x), words timed by estimate inside Spotify's line
                   times (KaraokeTiming.m), which line to name where two voices sing at once (the one that came in first,
@@ -149,7 +146,7 @@ Shared:
                   and is drawn from its own measures, not the Kit's, so it sits there under either look. Tested on the
                   Mac against harness/pitch/ and in the simulator against harness/speed/ and harness/menu/
     Haptics/      Vibrations (Haptics.h lists its files): a tap of UIKit's feedback generators for the player's and the now
-                  playing bar's controls, the scrubber's tenths and ends, cover swipes, gestures and the lyrics page's tap to
+                  playing bar's controls, the scrubber's tenths and ends, cover swipes and the lyrics page's tap to
                   seek, at the strength set for them (ControlHaptics.x, SGFeedback.m); and Music Haptics, Core Haptics
                   playing along with the song: Audio/SGAudioPipeline supplies final samples after speed and pitch;
                   in the unit's output format (the hardware's), they go through a drum
@@ -166,7 +163,7 @@ Native:
     Navbar/       Spotify's tab bar composed (Navbar.x, NavbarLayout.m, hooked from TabBarHooks.x), the Navbar and Add a tab pages
     NowPlayingBar/ the device button hidden, the bar's flags
     Player/       the full screen player (Player.x), its cards and buttons hidden (PlayerDeclutter.x), the glass lyrics card
-                  (LyricsCard.x), the gestures' hookup, the Queue & devices flags
+                  (LyricsCard.x), the Queue & devices flags
     Lyrics/       the full screen lyrics page on glass (LyricsPage.x)
     Home/         the Home gradient, Home's sections and pills hidden (HomeDeclutter.x), the Home & Library page
     Playlist/     the playlist header and pills, hidden one switch each
@@ -320,7 +317,7 @@ beside the row, "Needs iOS 27" below iOS 27. Then a card of parts. Navbar: the t
 each with its own list of tabs. Lyrics, beside Player: the ordered list of lyrics sources, lyrics for every track,
 naming the source in the redesign, the lock screen, and glass lyrics in the native look; in the redesign also
 which of the lyrics, their pronunciation and their translation is set largest, and the translation's language.
-Player: Gestures, Blocked artists (with the count on the row) and Lock screen widget (its controls and, under Artwork, Animated lock screen, the track's Canvas or the album's Apple Music cover played behind the lock screen's controls, on until switched off, with a Sources page for their order, and a "Needs iOS 26" row below that), which work with either look;
+Player: Lock screen widget (its controls and, under Artwork, Animated lock screen, the track's Canvas or the album's Apple Music cover played behind the lock screen's controls, on until switched off, with a Sources page for their order, and a "Needs iOS 26" row below that), which work with either look;
 in the native look also Now playing bar (its device button and its flags), Queue & devices, and
 Spotify's own player screen (artwork background, glass header buttons, Disable Canvas and the sheet,
 header, slider and sticky header flags, the cards under the player and the lyrics preview and player

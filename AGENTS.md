@@ -16,7 +16,7 @@ A Theos tweak (Objective-C + Logos) injected into the decrypted Spotify iOS app.
   throughout, and its own accent colour. No native tweak runs.
 
 Anything that doesn't draw on Spotify's screens works the same under both: privacy, lyrics
-sources, gestures, blocked artists, flags, Vibrations and Speed and pitch. Those
+sources, flags, Vibrations and Speed and pitch. Those
 last two were the redesign's until they moved to `Shared/`, so their keys lost the `.redesign.` and
 `Core/SGPrefs.h`'s `SGMigrateKey` carries the old ones over at launch.
 

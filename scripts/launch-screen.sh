@@ -1,6 +1,5 @@
 #!/usr/bin/env bash
-# Makes the IPA's launch screen plain: Spotify's has its logo in the middle, one picture for every app icon,
-# and the mod shows the icon in use itself once the app is up (tweak/Sources/Shared/Splash).
+# Makes the IPA's launch screen plain: Spotify's has its logo in the middle, one picture for every app icon.
 #
 #   scripts/launch-screen.sh <out.ipa>   (pipeline.sh runs it)
 #
