@@ -4,8 +4,8 @@ on:
   workflow_dispatch:
     inputs:
       ipa_url:
-        description: "Direct link to a decrypted Spotify IPA"
-        required: true
+        description: "Direct link to a decrypted Spotify IPA (empty: the IPA_URL secret)"
+        required: false
         type: string
       flex:
         description: "Include FLEX and the Home scroll profiler (log.txt in Spotify's Documents/Sigma)"
@@ -44,9 +44,14 @@ jobs:
           python3 -m pip install --break-system-packages git+https://github.com/asdfzxcvbn/pyzule-rw.git
 
       - name: Download IPA
+        env:
+          INPUT_URL: ${{ inputs.ipa_url }}
+          SECRET_URL: ${{ secrets.IPA_URL }}
         run: |
           mkdir -p ipa
-          curl -fsSL "${{ inputs.ipa_url }}" -o ipa/spotify.ipa
+          URL="${INPUT_URL:-$SECRET_URL}"
+          [ -n "$URL" ] || { echo "::error::No ipa_url given and no IPA_URL secret set"; exit 1; }
+          curl -fsSL "$URL" -o ipa/spotify.ipa
           case "$(file --mime-type -b ipa/spotify.ipa)" in application/zip|application/x-ios-app) ;; *) echo "::error::Not an IPA"; exit 1 ;; esac
 
       - name: Build
