@@ -1,6 +1,6 @@
 // Player redesign: Animated artwork, the track's Canvas or its album's Apple Music cover looping muted over
 // Fluid artwork and under the rest of the player, found the way the lock screen finds its clip but in an
-// order of its own. Fluid artwork shows until the clip can be drawn and for a track without one.
+// order of its own. Fluid artwork shows until the clip can be drawn, for a track without one, and while the lyrics are up.
 #import <AVFoundation/AVFoundation.h>
 #import "Core/SGCore.h"
 #import "Redesigned/Kit/SGRKit.h"
@@ -170,8 +170,6 @@ static void readLight(NSURL *file, void (^done)(float light)) {
     CALayer *_clips;
     CALayer *_dim;
     CAGradientLayer *_shade;
-    // Over the clip, dim and shade while the lyrics are up: the clip at full strength made them unreadable.
-    UIVisualEffectView *_blur;
     NSMutableArray<SGRPlayerClip *> *_leaving;   // under the one coming in until it is in
     BOOL _playing, _lyricsUp;
     float _light;   // the shown clip's
@@ -210,10 +208,6 @@ static float dimFor(float light, BOOL lyricsUp) {
                       (id)[black colorWithAlphaComponent:kShadeBottom].CGColor];
     _shade.locations = @[@0.45, @0.75, @1];
     [self.layer addSublayer:_shade];
-    _blur = [[UIVisualEffectView alloc] initWithEffect:nil];
-    _blur.userInteractionEnabled = NO;
-    _blur.accessibilityElementsHidden = YES;
-    [self addSubview:_blur];
     return self;
 }
 
@@ -228,7 +222,6 @@ static float dimFor(float light, BOOL lyricsUp) {
     _clips.frame = bounds;
     _dim.frame = bounds;
     _shade.frame = bounds;
-    _blur.frame = bounds;
     _clip.layer.frame = bounds;
     for (SGRPlayerClip *clip in _leaving) clip.layer.frame = bounds;
 }
@@ -349,9 +342,6 @@ static void fade(CALayer *layer, float to, NSTimeInterval duration) {
 - (void)setLyricsUp:(BOOL)up animated:(BOOL)animated {
     _lyricsUp = up;
     fade(_dim, dimFor(_light, up), animated && self.window ? kDimChange : 0);
-    UIBlurEffect *effect = up ? [UIBlurEffect effectWithStyle:UIBlurEffectStyleDark] : nil;
-    if (animated && self.window) [UIView animateWithDuration:kDimChange animations:^{ self->_blur.effect = effect; }];
-    else _blur.effect = effect;
 }
 
 @end
@@ -404,6 +394,8 @@ static NSString *heldBack(void) {
     if (NSProcessInfo.processInfo.lowPowerModeEnabled) return @"Low Power Mode";
     if (SGRReduceMotion()) return @"Reduce Motion";
     if (sg_videos.allObjects.count) return @"Spotify's own video is showing";
+    // Fluid artwork is the song's colours blurred: behind the lyrics it reads better than a moving picture.
+    if (sg_lyricsUp) return @"the lyrics are up";
     return nil;
 }
 
@@ -638,6 +630,7 @@ UIView *SGRPlayerAnimatedViewIn(UIView *plane, SGRArtworkField *field) {
 void SGRPlayerAnimatedFollowLyrics(BOOL open, BOOL animated) {
     sg_lyricsUp = open;
     [sg_view setLyricsUp:open animated:animated];
+    update();
 }
 
 #pragma mark - the player
