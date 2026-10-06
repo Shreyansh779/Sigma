@@ -19,6 +19,8 @@ static NSInteger sg_accent = -1;   // 0xRRGGBB once chosen, read at launch
 static const NSInteger kDefaultAccent = 0x37F200;
 
 static NSInteger chosen(void) {
+    NSInteger icon = SGAppIconThemeRGB();
+    if (icon >= 0) return icon;
     NSInteger rgb = SGInt(SGRKeyAccent, kDefaultAccent);
     return rgb >= 0 && rgb <= 0xFFFFFF ? rgb : -1;
 }

@@ -38,7 +38,7 @@ UIViewController *SGAboutPage(void) {
     reset.color = SGRed();
     NSString *spotify = [NSBundle.mainBundle objectForInfoDictionaryKey:@"CFBundleShortVersionString"] ?: @"unknown";
     NSMutableArray<SGModSection *> *sections = [NSMutableArray arrayWithObject:SGSection(nil, @[
-        SGStatRow(@"Version", ^NSString *{ return @(SG_VERSION); }),
+        SGStatRow(@"Version", ^NSString *{ return @"Trima"; }),
         SGStatRow(@"Spotify", ^NSString *{ return spotify; }),
     ])];
     SGModRow *appIcon = SGAppIconRow();

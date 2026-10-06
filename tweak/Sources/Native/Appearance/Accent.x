@@ -15,6 +15,8 @@ static const uint32_t kGreens[] = {0x1ED760, 0x1DB954};
 static NSInteger sg_accent = -1;   // 0xRRGGBB once chosen, read at launch
 
 static NSInteger chosen(void) {
+    NSInteger icon = SGAppIconThemeRGB();
+    if (icon >= 0) return icon;
     NSInteger rgb = SGInt(SGKeyAccent, -1);
     return rgb >= 0 && rgb <= 0xFFFFFF ? rgb : -1;
 }

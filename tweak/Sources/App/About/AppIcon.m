@@ -82,19 +82,40 @@ static UIImage *preview(NSString *file) {
     SGInsetForBars(self.tableView);
 }
 
+- (NSInteger)numberOfSectionsInTableView:(UITableView *)table {
+    return 2;
+}
+
 - (NSInteger)tableView:(UITableView *)table numberOfRowsInSection:(NSInteger)section {
-    return (NSInteger)_files.count;
+    return section == 0 ? (NSInteger)_files.count : 1;
 }
 
 - (CGFloat)tableView:(UITableView *)table heightForHeaderInSection:(NSInteger)section {
-    return CGFLOAT_MIN;
+    return section == 0 ? CGFLOAT_MIN : 16;
 }
 
 - (CGFloat)tableView:(UITableView *)table heightForFooterInSection:(NSInteger)section {
     return CGFLOAT_MIN;
 }
 
+// What the accent follows is read at launch, like every switch.
+- (void)themeToggled:(UISwitch *)toggle {
+    SGSetEnabled(SGKeyAppIconTheme, toggle.on);
+    SGAppIconRemember(currentFile());
+}
+
 - (UITableViewCell *)tableView:(UITableView *)table cellForRowAtIndexPath:(NSIndexPath *)path {
+    if (path.section == 1) {
+        UITableViewCell *cell = SGDequeueCell(table, @"appicontheme");
+        SGFillCell(cell, @"Use the icon's colour", @"The accent follows the icon instead of Spotify's green. Restart to apply", nil, nil);
+        UISwitch *toggle = [UISwitch new];
+        toggle.on = SGHidden(SGKeyAppIconTheme);
+        toggle.onTintColor = SGGreen();
+        [toggle addTarget:self action:@selector(themeToggled:) forControlEvents:UIControlEventValueChanged];
+        cell.accessoryView = toggle;
+        cell.selectionStyle = UITableViewCellSelectionStyleNone;
+        return cell;
+    }
     UITableViewCell *cell = SGDequeueCell(table, @"appicon");
     NSString *file = _files[(NSUInteger)path.row];
     SGFillCell(cell, titleOf(file), nil, nil, nil);
@@ -115,12 +136,14 @@ static UIImage *preview(NSString *file) {
 
 - (void)tableView:(UITableView *)table didSelectRowAtIndexPath:(NSIndexPath *)path {
     [table deselectRowAtIndexPath:path animated:YES];
+    if (path.section != 0) return;
     NSString *file = _files[(NSUInteger)path.row];
     if ([file isEqualToString:currentFile()]) return;
     __weak UITableView *weakTable = table;
     [UIApplication.sharedApplication setAlternateIconName:alternateName(file) completionHandler:^(NSError *error) {
         dispatch_async(dispatch_get_main_queue(), ^{
             SGLog(@"app icon: %@ -> %@", file, error ?: @"set");
+            if (!error) SGAppIconRemember(file);
             [weakTable reloadData];
             if (!error) return;
             UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"The icon did not change"
@@ -137,6 +160,8 @@ static UIImage *preview(NSString *file) {
 SGModRow *SGAppIconRow(void) {
     if (availableFiles().count < 2) return nil;
     if (@available(iOS 26.0, *)) {
+        // Whatever icon is in use now, for the colour to follow, including one picked before this existed.
+        SGAppIconRemember(currentFile());
         SGModRow *row = SGPageRow(@"App icon", ^UIViewController *{ return [SGAppIconPage new]; });
         row.value = ^NSString *{ return titleOf(currentFile()); };
         return row;

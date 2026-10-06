@@ -75,6 +75,8 @@ static NSString *const kAccentKey = @"spotifyglass.accent";
 static NSString *const kRedesignAccentKey = @"spotifyglass.redesign.accent";
 
 static UIColor *lookAccent(void) {
+    NSInteger icon = SGAppIconThemeRGB();
+    if (icon >= 0) return [UIColor colorWithRed:((icon >> 16) & 0xFF) / 255.0 green:((icon >> 8) & 0xFF) / 255.0 blue:(icon & 0xFF) / 255.0 alpha:1];
     NSInteger rgb = SGInt(SGRedesignedUI() ? kRedesignAccentKey : kAccentKey, -1);
     if (rgb < 0 || rgb > 0xFFFFFF) return nil;
     return [UIColor colorWithRed:((rgb >> 16) & 0xFF) / 255.0 green:((rgb >> 8) & 0xFF) / 255.0 blue:(rgb & 0xFF) / 255.0 alpha:1];
