@@ -136,7 +136,9 @@ static const CGFloat kReachSlop = 12;
     __block UIView *nearest = nil;
     __block CGFloat best = CGFLOAT_MAX;
     SGForEachView(row, ^(UIView *view) {
-        BOOL button = [view isKindOfClass:UIControl.class] || view.gestureRecognizers.count;
+        // Not the row itself, nor a container: its frame would take every touch around the footer.
+        BOOL button = view != row && ([view isKindOfClass:UIControl.class]
+            || [@[@"QueueButtonNowPlaying", @"Components.ConnectButtonOutputSwitcher"] containsObject:view.accessibilityIdentifier ?: @""]);
         if (!button || view.hidden || view.alpha < 0.01 || !view.userInteractionEnabled) return;
         CGRect frame = [self convertRect:view.bounds fromView:view];
         if (CGRectIsEmpty(frame) || !CGRectContainsPoint(CGRectInset(frame, -kReachSlop, -kReachSlop), point)) return;

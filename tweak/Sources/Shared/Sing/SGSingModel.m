@@ -51,20 +51,24 @@ static NSString *pathOf(int i) { return @(kFiles[i].path); }
 
 static NSURL *singFolder(void) {
     static NSURL *folder;
-    if (!folder) {
+    static dispatch_once_t once;
+    // Made once, with the migration finished before the folder is handed to anyone: a caller on another
+    // thread would otherwise make Sigma/Sing first and the earlier model would never be moved.
+    dispatch_once(&once, ^{
         NSString *root = SGSingModelRoot;
         NSURL *base = root ? [NSURL fileURLWithPath:root isDirectory:YES]
             : [NSFileManager.defaultManager URLsForDirectory:NSApplicationSupportDirectory inDomains:NSUserDomainMask].firstObject;
-        folder = [base URLByAppendingPathComponent:@"Sigma/Sing" isDirectory:YES];
+        NSURL *made = [base URLByAppendingPathComponent:@"Sigma/Sing" isDirectory:YES];
         // The folder was spoti.pw/Sing before the project was renamed: a model already downloaded moves
         // across instead of being fetched again.
         NSURL *earlier = [base URLByAppendingPathComponent:@"spoti.pw/Sing" isDirectory:YES];
         NSFileManager *files = NSFileManager.defaultManager;
-        if ([files fileExistsAtPath:earlier.path] && ![files fileExistsAtPath:folder.path]) {
-            [files createDirectoryAtURL:folder.URLByDeletingLastPathComponent withIntermediateDirectories:YES attributes:nil error:nil];
-            [files moveItemAtURL:earlier toURL:folder error:nil];
+        if ([files fileExistsAtPath:earlier.path] && ![files fileExistsAtPath:made.path]) {
+            [files createDirectoryAtURL:made.URLByDeletingLastPathComponent withIntermediateDirectories:YES attributes:nil error:nil];
+            [files moveItemAtURL:earlier toURL:made error:nil];
         }
-    }
+        folder = made;
+    });
     return folder;
 }
 static NSURL *installedModel(void) { return [singFolder() URLByAppendingPathComponent:@"separator.mlmodelc" isDirectory:YES]; }
