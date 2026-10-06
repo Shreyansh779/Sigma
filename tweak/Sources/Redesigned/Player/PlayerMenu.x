@@ -43,6 +43,7 @@ static const CGFloat kPanelWidth = 300, kPanelTop = 12;
 static BOOL sgr_menuOn;
 static __weak UIView *sgr_moreButton;
 static NSTimeInterval sgr_moreTappedAt;
+static NSTimeInterval sgr_moreTouchedAt;
 static char kTakeoverKey, kWatchedKey, kDimmingKey, kMaskKey, kSavedMaskKey, kClaimKey, kTakenKey, kHiddenDimmingsKey, kAnchorKey;
 
 #pragma mark - where each of Spotify's rows goes
@@ -94,6 +95,7 @@ static UIImage *symbol(NSString *name) {
 // stall of the main thread is sampled (Diagnostics/SGHangSampler.h), so a slow ⋯ says what held it.
 - (void)touchedDown:(UILongPressGestureRecognizer *)press {
     if (press.state != UIGestureRecognizerStateBegan) return;
+    sgr_moreTouchedAt = CACurrentMediaTime();
     SGLog(@"redesign player menu: the ⋯ was touched");
     SGHangSamplerStart(@"player menu", 4);
 }
@@ -775,7 +777,10 @@ static void openMenu(SGRPlayerMenuTakeover *t) {
     if (button.window) {
         t.anchor = anchorIn(button);
         __weak SGRPlayerMenuTakeover *weak = t;
-        t.anchor.shown = ^{ weak.shown = YES; };
+        t.anchor.shown = ^{
+            weak.shown = YES;
+            SGLog(@"redesign player menu: the menu starts to show %.2f s after the ⋯ was touched", CACurrentMediaTime() - sgr_moreTouchedAt);
+        };
         t.anchor.closed = ^{ menuClosed(weak); };
         showRows(t);
     }
