@@ -7,6 +7,10 @@ void SGAppIconRemember(NSString *file) {
     if (file) [NSUserDefaults.standardUserDefaults setObject:file forKey:kIconKey];
 }
 
+NSString *SGAppIconRemembered(void) {
+    return [NSUserDefaults.standardUserDefaults stringForKey:kIconKey];
+}
+
 NSInteger SGAppIconThemeRGB(void) {
     if (!SGHidden(SGKeyAppIconTheme)) return -1;
     NSString *file = [NSUserDefaults.standardUserDefaults stringForKey:kIconKey];

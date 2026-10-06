@@ -9,8 +9,11 @@
 
 static char kIconKey;
 
-// The list's name for the icon in use (App/About/AppIcon.m): Spotify's own is no alternate.
+// The list's name for the icon in use (App/About/AppIcon.m): the one remembered when it was picked, else
+// what UIApplication says; Spotify's own is no alternate.
 static NSString *iconFile(void) {
+    NSString *remembered = SGAppIconRemembered();
+    if (remembered.length) return remembered;
     NSString *name = UIApplication.sharedApplication.alternateIconName;
     return [name hasPrefix:@"SGAppIcon"] ? [name substringFromIndex:@"SGAppIcon".length] : @"Spotify";
 }
