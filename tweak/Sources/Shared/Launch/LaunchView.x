@@ -24,6 +24,15 @@ static UIImage *iconImage(void) {
     return image ? [UIImage imageWithCGImage:image.CGImage scale:3 orientation:UIImageOrientationUp] : nil;
 }
 
+// Text, controls and spinners are the screen's own and stay: a retry button or a message is no logo.
+static BOOL hasContent(UIView *view) {
+    if ([view isKindOfClass:UILabel.class] || [view isKindOfClass:UIControl.class] || [view isKindOfClass:UIActivityIndicatorView.class]) return YES;
+    for (UIView *sub in view.subviews) {
+        if (hasContent(sub)) return YES;
+    }
+    return NO;
+}
+
 static void swapLogo(UIViewController *page) {
     UIView *root = page.viewIfLoaded;
     if (!root) return;
@@ -42,7 +51,7 @@ static void swapLogo(UIViewController *page) {
     }
     __block NSUInteger count = 0;
     SGForEachView(root, ^(UIView *v) {
-        if (v == root || v == icon || v.alpha == 0) return;
+        if (v == root || v == icon || v.alpha == 0 || hasContent(v)) return;
         v.alpha = 0;
         count++;
     });

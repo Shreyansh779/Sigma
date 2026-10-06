@@ -101,7 +101,8 @@ static UIImage *preview(NSString *file) {
 // What the accent follows is read at launch, like every switch.
 - (void)themeToggled:(UISwitch *)toggle {
     SGSetEnabled(SGKeyAppIconTheme, toggle.on);
-    SGAppIconRemember(currentFile());
+    // What was picked is kept when it is picked; this only fills in a choice made before it was kept.
+    if (!SGAppIconRemembered()) SGAppIconRemember(currentFile());
 }
 
 - (UITableViewCell *)tableView:(UITableView *)table cellForRowAtIndexPath:(NSIndexPath *)path {
@@ -160,8 +161,9 @@ static UIImage *preview(NSString *file) {
 SGModRow *SGAppIconRow(void) {
     if (availableFiles().count < 2) return nil;
     if (@available(iOS 26.0, *)) {
-        // Whatever icon is in use now, for the colour to follow, including one picked before this existed.
-        SGAppIconRemember(currentFile());
+        // An icon picked before the choice was kept is taken as it is now; one already kept is not overwritten,
+        // since UIApplication can read nil early or inside another app.
+        if (!SGAppIconRemembered()) SGAppIconRemember(currentFile());
         SGModRow *row = SGPageRow(@"App icon", ^UIViewController *{ return [SGAppIconPage new]; });
         row.value = ^NSString *{ return titleOf(currentFile()); };
         return row;
