@@ -124,13 +124,16 @@ void SGRPlayerMenuWatchMoreButton(UIView *button) {
     tap.delaysTouchesEnded = NO;
     tap.delegate = watcher;
     [button addGestureRecognizer:tap];
-    UILongPressGestureRecognizer *down = [[UILongPressGestureRecognizer alloc] initWithTarget:watcher action:@selector(touchedDown:)];
-    down.minimumPressDuration = 0;
-    down.cancelsTouchesInView = NO;
-    down.delaysTouchesBegan = NO;
-    down.delaysTouchesEnded = NO;
-    down.delegate = watcher;
-    [button addGestureRecognizer:down];
+    // Only with the debug log on: it times the ⋯'s touch and samples stalls after it.
+    if (SGDebugLog()) {
+        UILongPressGestureRecognizer *down = [[UILongPressGestureRecognizer alloc] initWithTarget:watcher action:@selector(touchedDown:)];
+        down.minimumPressDuration = 0;
+        down.cancelsTouchesInView = NO;
+        down.delaysTouchesBegan = NO;
+        down.delaysTouchesEnded = NO;
+        down.delegate = watcher;
+        [button addGestureRecognizer:down];
+    }
 }
 
 #pragma mark - Spotify's rows, read
@@ -779,7 +782,7 @@ static void openMenu(SGRPlayerMenuTakeover *t) {
         __weak SGRPlayerMenuTakeover *weak = t;
         t.anchor.shown = ^{
             weak.shown = YES;
-            SGLog(@"redesign player menu: the menu starts to show %.2f s after the ⋯ was touched", CACurrentMediaTime() - sgr_moreTouchedAt);
+            if (SGDebugLog()) SGLog(@"redesign player menu: the menu starts to show %.2f s after the ⋯ was touched", CACurrentMediaTime() - sgr_moreTouchedAt);
         };
         t.anchor.closed = ^{ menuClosed(weak); };
         showRows(t);

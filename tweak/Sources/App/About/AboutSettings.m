@@ -47,6 +47,9 @@ UIViewController *SGAboutPage(void) {
         SGSection(nil, @[
             withSymbol(SGActionRow(@"Welcome tour", nil, ^{ SGShowOnboarding(); }), @"map"),
         ]),
+        SGSection(@"For finding faults", @[
+            SGHideRow(@"Debug log", @"Writes what the mod does, with touches and stalls, to Documents/Sigma/log.txt. Restart to apply", SGKeyDebugLog),
+        ]),
         SGSection(nil, @[reset]),
     ]];
     return [[SGModPage alloc] initWithTitle:@"Mod" intro:nil sections:sections footer:nil];

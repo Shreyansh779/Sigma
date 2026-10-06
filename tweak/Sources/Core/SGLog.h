@@ -5,6 +5,10 @@
 // Documents/Sigma/log.txt in Spotify's container (SGLogToFile), which the Files app shows, so a log can be
 // read without a Mac.
 void SGLogToFile(NSString *line);
+// Mod > Mod > Debug log, read at launch: the file log above, the touch trace (Diagnostics/TouchTrace.x) and the
+// stall sampler on the player's ⋯ are all off unless it is on, since they record what the person does.
+#define SGKeyDebugLog @"spotifyglass.debugLog"
+BOOL SGDebugLog(void);
 #define SGLog(fmt, ...) do { NSString *sg_line = [NSString stringWithFormat:(fmt), ##__VA_ARGS__];     os_log_with_type(OS_LOG_DEFAULT, OS_LOG_TYPE_DEFAULT, "[spotifyglass] %{public}s", sg_line.UTF8String);     SGLogToFile(sg_line); } while (0)
 
 // Long dumps, split into numbered parts under the unified log's size cap.

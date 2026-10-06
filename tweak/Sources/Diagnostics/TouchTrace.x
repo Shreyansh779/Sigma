@@ -44,5 +44,6 @@ static NSString *describe(UIView *view) {
 %end
 
 %ctor {
+    if (!SGDebugLog()) return;
     %init;
 }
