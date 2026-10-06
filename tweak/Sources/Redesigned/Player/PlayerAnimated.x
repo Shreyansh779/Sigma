@@ -170,6 +170,8 @@ static void readLight(NSURL *file, void (^done)(float light)) {
     CALayer *_clips;
     CALayer *_dim;
     CAGradientLayer *_shade;
+    // Over the clip, dim and shade while the lyrics are up: the clip at full strength made them unreadable.
+    UIVisualEffectView *_blur;
     NSMutableArray<SGRPlayerClip *> *_leaving;   // under the one coming in until it is in
     BOOL _playing, _lyricsUp;
     float _light;   // the shown clip's
@@ -208,6 +210,10 @@ static float dimFor(float light, BOOL lyricsUp) {
                       (id)[black colorWithAlphaComponent:kShadeBottom].CGColor];
     _shade.locations = @[@0.45, @0.75, @1];
     [self.layer addSublayer:_shade];
+    _blur = [[UIVisualEffectView alloc] initWithEffect:nil];
+    _blur.userInteractionEnabled = NO;
+    _blur.accessibilityElementsHidden = YES;
+    [self addSubview:_blur];
     return self;
 }
 
@@ -222,6 +228,7 @@ static float dimFor(float light, BOOL lyricsUp) {
     _clips.frame = bounds;
     _dim.frame = bounds;
     _shade.frame = bounds;
+    _blur.frame = bounds;
     _clip.layer.frame = bounds;
     for (SGRPlayerClip *clip in _leaving) clip.layer.frame = bounds;
 }
@@ -342,6 +349,9 @@ static void fade(CALayer *layer, float to, NSTimeInterval duration) {
 - (void)setLyricsUp:(BOOL)up animated:(BOOL)animated {
     _lyricsUp = up;
     fade(_dim, dimFor(_light, up), animated && self.window ? kDimChange : 0);
+    UIBlurEffect *effect = up ? [UIBlurEffect effectWithStyle:UIBlurEffectStyleDark] : nil;
+    if (animated && self.window) [UIView animateWithDuration:kDimChange animations:^{ self->_blur.effect = effect; }];
+    else _blur.effect = effect;
 }
 
 @end
