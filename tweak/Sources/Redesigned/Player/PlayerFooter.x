@@ -114,6 +114,9 @@ static UIView *connectGlyphIn(UIView *holder) {
 // into a view for a touch outside its bounds. This band over the part that hangs out hands such a touch
 // to the row itself, and lets every other one through. It asks nothing of a row that cannot be seen, the
 // stack it is in faded out included (the lines alone, PlayerLyrics.x).
+// How far past a button a touch is still the button's, and how far the band reaches past the row.
+static const CGFloat kReachSlop = 12;
+
 @interface SGRFooterReach : UIView
 @property (nonatomic, weak) UIView *row;
 @end
@@ -126,7 +129,24 @@ static UIView *connectGlyphIn(UIView *holder) {
         if (view.alpha < 0.01 || view.hidden) return nil;
     }
     UIView *hit = [row hitTest:[row convertPoint:point fromView:self] withEvent:event];
-    return hit == row ? nil : hit;
+    if (hit && hit != row) return hit;
+    // A touch a little off a button, in the row's empty space or under it, goes to the nearest button
+    // within kReachSlop of it: the buttons' own frames are smaller than the glyphs drawn on them, and taps
+    // on the lower half of the queue glyph landed on nothing (touch trace, 2026-10-07).
+    __block UIView *nearest = nil;
+    __block CGFloat best = CGFLOAT_MAX;
+    SGForEachView(row, ^(UIView *view) {
+        BOOL button = [view isKindOfClass:UIControl.class] || view.gestureRecognizers.count;
+        if (!button || view.hidden || view.alpha < 0.01 || !view.userInteractionEnabled) return;
+        CGRect frame = [self convertRect:view.bounds fromView:view];
+        if (CGRectIsEmpty(frame) || !CGRectContainsPoint(CGRectInset(frame, -kReachSlop, -kReachSlop), point)) return;
+        CGFloat distance = hypot(point.x - CGRectGetMidX(frame), point.y - CGRectGetMidY(frame));
+        if (distance < best) {
+            best = distance;
+            nearest = view;
+        }
+    });
+    return nearest;
 }
 @end
 
@@ -178,7 +198,7 @@ static void lowerRow(UIView *row) {
     CGRect stackFrame = [stack convertRect:stack.bounds toView:player];
     CGRect drawn = [row convertRect:row.bounds toView:player];
     CGFloat from = CGRectGetMaxY(stackFrame);
-    CGRect band = CGRectMake(CGRectGetMinX(drawn), from, drawn.size.width, MAX(0, CGRectGetMaxY(drawn) - from));
+    CGRect band = CGRectMake(CGRectGetMinX(drawn) - kReachSlop, from, drawn.size.width + 2 * kReachSlop, MAX(0, CGRectGetMaxY(drawn) + kReachSlop - from));
     if (!CGRectEqualToRect(reach.frame, band)) reach.frame = band;
 
     static dispatch_once_t once;
