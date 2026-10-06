@@ -9,12 +9,12 @@
 #import "Shared/LockScreenArtwork/SGCanvas.h"
 #import "Player.h"
 
-static const NSTimeInterval kFadeIn = 0.6, kFadeOut = 0.45, kDimChange = 0.3;
+static const NSTimeInterval kFadeIn = 0.6, kFadeOut = 0.45;
 // The dim holds the brighter part of a clip (the 75th percentile of a few frames' linear luminance) under
 // this, where white text keeps 4.5:1 (7:1 with Increase Contrast), as Fluid artwork holds its own; never
 // less than the least, and more under the lyrics. Over it, the shade Fluid artwork has under the controls.
 static const float kCeiling = 0.18f, kCeilingContrast = 0.09f, kUnknownLight = 0.35f;
-static const float kDimLeast = 0.1f, kDimLyrics = 0.15f, kDimMost = 0.8f;
+static const float kDimLeast = 0.1f, kDimMost = 0.8f;
 static const float kShadeMiddle = 0.18f, kShadeBottom = 0.4f;
 static const NSTimeInterval kReadyWithin = 5;
 
@@ -163,7 +163,6 @@ static void readLight(NSURL *file, void (^done)(float light)) {
 - (void)showClip:(SGRPlayerClip *)clip;
 - (void)clear:(BOOL)animated;
 - (void)setPlaying:(BOOL)playing;
-- (void)setLyricsUp:(BOOL)up animated:(BOOL)animated;
 @end
 
 @implementation SGRPlayerAnimatedView {
@@ -171,16 +170,16 @@ static void readLight(NSURL *file, void (^done)(float light)) {
     CALayer *_dim;
     CAGradientLayer *_shade;
     NSMutableArray<SGRPlayerClip *> *_leaving;   // under the one coming in until it is in
-    BOOL _playing, _lyricsUp;
+    BOOL _playing;
     float _light;   // the shown clip's
     NSUInteger _generation;
 }
 
 // Blending black at `dim` over sRGB scales linear light by about (1 - dim)^2.2.
-static float dimFor(float light, BOOL lyricsUp) {
+static float dimFor(float light) {
     float ceiling = SGRIncreaseContrast() ? kCeilingContrast : kCeiling;
     float need = light > ceiling ? 1 - powf(ceiling / light, 1 / 2.2f) : 0;
-    return MIN(kDimMost, MAX(kDimLeast, need) + (lyricsUp ? kDimLyrics : 0));
+    return MIN(kDimMost, MAX(kDimLeast, need));
 }
 
 - (instancetype)initWithFrame:(CGRect)frame {
@@ -199,7 +198,7 @@ static float dimFor(float light, BOOL lyricsUp) {
     _dim.actions = still;
     _dim.backgroundColor = UIColor.blackColor.CGColor;
     _light = kUnknownLight;
-    _dim.opacity = dimFor(_light, NO);
+    _dim.opacity = dimFor(_light);
     [self.layer addSublayer:_dim];
     _shade = [CAGradientLayer layer];
     _shade.actions = still;
@@ -302,8 +301,8 @@ static void fade(CALayer *layer, float to, NSTimeInterval duration) {
         [view setCovers:YES];
     }];
     _light = clip.light;
-    fade(_dim, dimFor(_light, _lyricsUp), shownOpacity(self.layer) > 0.01f ? kFadeIn : 0);
-    say(@"%@ fades in, its light %.2f dimmed by %.2f", clip.file.lastPathComponent, _light, dimFor(_light, _lyricsUp));
+    fade(_dim, dimFor(_light), shownOpacity(self.layer) > 0.01f ? kFadeIn : 0);
+    say(@"%@ fades in, its light %.2f dimmed by %.2f", clip.file.lastPathComponent, _light, dimFor(_light));
     // Over a clip still on screen the new one fades in on top of it; over the field the whole view does.
     if (_leaving.count && shownOpacity(self.layer) > 0.01f) {
         clip.layer.opacity = 0;
@@ -337,11 +336,6 @@ static void fade(CALayer *layer, float to, NSTimeInterval duration) {
     _playing = playing;
     [_clip setPlaying:playing];
     for (SGRPlayerClip *clip in _leaving) [clip setPlaying:playing];
-}
-
-- (void)setLyricsUp:(BOOL)up animated:(BOOL)animated {
-    _lyricsUp = up;
-    fade(_dim, dimFor(_light, up), animated && self.window ? kDimChange : 0);
 }
 
 @end
@@ -614,7 +608,6 @@ UIView *SGRPlayerAnimatedViewIn(UIView *plane, SGRArtworkField *field) {
             if ([found.file isEqual:clip.file]) found.file = nil;
             [sg_view clear:YES];
         };
-        [view setLyricsUp:sg_lyricsUp animated:NO];
         say(@"view made in the background plane");
     }
     sg_field = field;
@@ -629,7 +622,6 @@ UIView *SGRPlayerAnimatedViewIn(UIView *plane, SGRArtworkField *field) {
 
 void SGRPlayerAnimatedFollowLyrics(BOOL open, BOOL animated) {
     sg_lyricsUp = open;
-    [sg_view setLyricsUp:open animated:animated];
     update();
 }
 
