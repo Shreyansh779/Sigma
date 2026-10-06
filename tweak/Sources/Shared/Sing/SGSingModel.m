@@ -56,6 +56,14 @@ static NSURL *singFolder(void) {
         NSURL *base = root ? [NSURL fileURLWithPath:root isDirectory:YES]
             : [NSFileManager.defaultManager URLsForDirectory:NSApplicationSupportDirectory inDomains:NSUserDomainMask].firstObject;
         folder = [base URLByAppendingPathComponent:@"Sigma/Sing" isDirectory:YES];
+        // The folder was spoti.pw/Sing before the project was renamed: a model already downloaded moves
+        // across instead of being fetched again.
+        NSURL *earlier = [base URLByAppendingPathComponent:@"spoti.pw/Sing" isDirectory:YES];
+        NSFileManager *files = NSFileManager.defaultManager;
+        if ([files fileExistsAtPath:earlier.path] && ![files fileExistsAtPath:folder.path]) {
+            [files createDirectoryAtURL:folder.URLByDeletingLastPathComponent withIntermediateDirectories:YES attributes:nil error:nil];
+            [files moveItemAtURL:earlier toURL:folder error:nil];
+        }
     }
     return folder;
 }

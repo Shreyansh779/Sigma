@@ -18,7 +18,6 @@
 //     PlayerScroll.x     the list held at its top, so the player is one screen and cannot be scrolled up
 //     PlayerLyrics.x     the lyrics in the player: the cover as a thumbnail, the title up beside it,
 //                        and after a few seconds untouched the lines alone on the whole player
-//     PlayerGestures.x   the gestures' hookup
 //     PlayerMorph.x      the open and close grown out of the now playing bar's card, the cover flown
 //     PlayerMenu.x       the ⋯ opening a menu the way the Music app draws one (SGRPlayerMenu.h), over
 //                        Spotify's own sheet, which it reads its rows from and keeps out of sight
