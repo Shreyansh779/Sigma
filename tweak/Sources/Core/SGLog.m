@@ -1,9 +1,18 @@
 #import "SGLog.h"
+#import "SGPrefs.h"
 
 // Kept short: a log past this size is started again at the next launch.
 static const unsigned long long kLogLimit = 512 * 1024;
 
+BOOL SGDebugLog(void) {
+    static BOOL on;
+    static dispatch_once_t once;
+    dispatch_once(&once, ^{ on = SGHidden(SGKeyDebugLog); });
+    return on;
+}
+
 void SGLogToFile(NSString *line) {
+    if (!SGDebugLog()) return;
     static dispatch_queue_t queue;
     static NSString *path;
     static dispatch_once_t once;
