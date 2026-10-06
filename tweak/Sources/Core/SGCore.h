@@ -3,6 +3,7 @@
 #import "SGRuntime.h"
 #import "SGLog.h"
 #import "SGPrefs.h"
+#import "SGAppIconTheme.h"
 #import "SGViewTree.h"
 #import "SGGlass.h"
 #import "SGBackdrop.h"
