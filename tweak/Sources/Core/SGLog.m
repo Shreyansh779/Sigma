@@ -48,7 +48,10 @@ void SGLogLong(NSString *tag, NSString *text) {
     }
     if (current.length) [parts addObject:current];
     [parts enumerateObjectsUsingBlock:^(NSString *part, NSUInteger i, BOOL *stop) {
-        SGLog(@"%@ %lu/%lu\n%@", tag, (unsigned long)i + 1, (unsigned long)parts.count, part);
+        NSString *line = [NSString stringWithFormat:@"%@ %lu/%lu\n%@", tag, (unsigned long)i + 1, (unsigned long)parts.count, part];
+        // Only the hang samples go to the file log: the other dumps run to megabytes and would swamp it.
+        if ([tag hasPrefix:@"hang"]) SGLogToFile(line);
+        os_log_with_type(OS_LOG_DEFAULT, OS_LOG_TYPE_DEFAULT, "[spotifyglass] %{public}s", line.UTF8String);
     }];
 }
 
