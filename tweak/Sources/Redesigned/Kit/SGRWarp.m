@@ -374,6 +374,8 @@ static NSUInteger sg_costLogs;
     CFTimeInterval _lastTick;
     BOOL _dirty, _drawQueued;
     SGRWarpCost _cost;
+    // Frames handed to the GPU and not yet done: a frame is skipped, not waited for, past this many.
+    dispatch_semaphore_t _inflight;
 }
 
 - (instancetype)init {
@@ -382,7 +384,10 @@ static NSUInteger sg_costLogs;
     self.pixelFormat = MTLPixelFormatBGRA8Unorm;
     self.framebufferOnly = YES;
     self.opaque = YES;
-    self.maximumDrawableCount = 2;
+    // Three, with two frames in flight at most (_inflight), so nextDrawable always has one to give. With two,
+    // the main thread waited for the display on every frame: 20 ms a frame at 30 a second on a 60 Hz phone.
+    self.maximumDrawableCount = 3;
+    _inflight = dispatch_semaphore_create(2);
     self.actions = noActions();
     self.contentsGravity = kCAGravityResize;
     _look = SGRWarpDefaultLook;
@@ -581,11 +586,19 @@ static NSUInteger sg_costLogs;
     SGRWarpGPU *gpu = sg_gpu;
     CGRect bounds = self.bounds;
     if (![self canDraw] || !_to || bounds.size.width < 1 || bounds.size.height < 1) return;
+    // The GPU is behind: this frame is not drawn, and the next one is tried a moment later.
+    if (dispatch_semaphore_wait(_inflight, DISPATCH_TIME_NOW) != 0) {
+        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.016 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{ [self changed]; });
+        return;
+    }
     CFTimeInterval began = CACurrentMediaTime();
     CGSize size = self.drawableSize;
     @autoreleasepool {
         id<CAMetalDrawable> drawable = [self nextDrawable];
-        if (!drawable) return;
+        if (!drawable) {
+            dispatch_semaphore_signal(_inflight);
+            return;
+        }
         CGRect picture = CGRectIsNull(_pictureFrame) || _pictureFrame.size.width < 1 || _pictureFrame.size.height < 1 ? bounds : _pictureFrame;
         float blend = [self fadeAt:now];
         if (blend >= 1) _fadeStart = 0;
@@ -607,6 +620,8 @@ static NSUInteger sg_costLogs;
         id<MTLCommandBuffer> buffer = [gpu.queue commandBuffer];
         encodePass(buffer, _pass, drawable.texture, gpu.warp, _from ?: _to, _to, &frame, sizeof frame);
         [buffer presentDrawable:drawable];
+        dispatch_semaphore_t inflight = _inflight;
+        [buffer addCompletedHandler:^(id<MTLCommandBuffer> done) { dispatch_semaphore_signal(inflight); }];
         if (_link && !_link.paused && sg_costLogs < 3) [self measure:buffer];
         [buffer commit];
     }
