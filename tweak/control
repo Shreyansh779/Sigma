@@ -1,0 +1,7 @@
+Package: com.sigma
+Name: Sigma
+Architecture: iphoneos-arm
+Description: Liquid Glass for the Spotify iOS app
+Maintainer: Sigma
+Author: Sigma
+Section: Tweaks
