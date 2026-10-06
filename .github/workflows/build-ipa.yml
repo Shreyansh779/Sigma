@@ -8,7 +8,7 @@ on:
         required: false
         type: string
       flex:
-        description: "Include FLEX and the Home scroll profiler (log.txt in Spotify's Documents/Sigma)"
+        description: "Include FLEX and the Home scroll profiler (a log.txt in Spotify's Documents/Sigma only with Mod Settings > Mod > Debug log on)"
         default: true
         type: boolean
       upload_method:

@@ -1,9 +1,9 @@
 #import <Foundation/Foundation.h>
 #import <os/log.h>
 
-// %{public}s so idevicesyslog on the Mac sees the text instead of <private>. Every line also goes to
-// Documents/Sigma/log.txt in Spotify's container (SGLogToFile), which the Files app shows, so a log can be
-// read without a Mac.
+// %{public}s so idevicesyslog on the Mac sees the text instead of <private>. With Debug log on (below)
+// every line also goes to Documents/Sigma/log.txt in Spotify's container (SGLogToFile), which the Files app
+// shows, so a log can be read without a Mac.
 void SGLogToFile(NSString *line);
 // Mod > Mod > Debug log, read at launch: the file log above, the touch trace (Diagnostics/TouchTrace.x) and the
 // stall sampler on the player's ⋯ are all off unless it is on, since they record what the person does.
