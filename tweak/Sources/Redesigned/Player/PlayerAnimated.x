@@ -280,7 +280,10 @@ static void fade(CALayer *layer, float to, NSTimeInterval duration) {
     clip.ready = ^(SGRPlayerClip *ready) { [weakSelf fadeIn:ready generation:generation]; };
     dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(kReadyWithin * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
         SGRPlayerAnimatedView *view = weakSelf;
-        if (!view || view.clip != clip || clip.layer.readyForDisplay) return;
+        // A clip that has faded in was drawn; one still waiting while the app is away (Notification Center) is
+        // not broken, it draws once the app is back.
+        if (!view || view.clip != clip || !clip.ready || clip.layer.readyForDisplay) return;
+        if (UIApplication.sharedApplication.applicationState != UIApplicationStateActive) return;
         if (view.neverReady) view.neverReady(clip);
     });
 }
