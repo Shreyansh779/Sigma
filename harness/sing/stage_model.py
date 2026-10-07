@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Stage Sing's compiled voice model for its host and print the manifest the app pins; uploads nothing.
 
-The folder it makes is the model repository's contents (https://huggingface.co/Darkkos/spoti-sing): the
+The folder it makes is the model repository's contents (https://huggingface.co/ralphguu/spotify-sing-model): the
 files of separator.mlmodelc at their paths inside it, NOTICE, and a model card. The manifest is printed the
 way tweak/Sources/Shared/Sing/SGSingModel.m pins it, and compared with the table there.
 """
@@ -14,7 +14,7 @@ import shutil
 import subprocess
 import sys
 
-HOST = "https://huggingface.co/Darkkos/spoti-sing"
+HOST = "https://huggingface.co/ralphguu/spotify-sing-model"
 here = Path(__file__).resolve().parent
 code = here.parent.parent / "tweak/Sources/Shared/Sing/SGSingModel.m"
 

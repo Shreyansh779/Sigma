@@ -204,7 +204,7 @@ a bar under it and Cancel download, Checking…, Downloaded · 467 MB with Remov
 Paused / Download failed, whose tap says why. Below iOS 27 the section is a "Needs iOS 27" row.
 
 `Shared/Sing/SGSingModel.m` downloads the five files of `separator.mlmodelc` one by one from
-`https://huggingface.co/Darkkos/spoti-sing/resolve/main/<path>` (no archive: iOS has no public
+`https://huggingface.co/ralphguu/spotify-sing-model/resolve/main/<path>` (no archive: iOS has no public
 unzip) and pins each file's size and SHA-256 in its table; nothing the server says about them is
 trusted. It checks for free space first (the model plus 64 MB), asks before using a cellular or Low
 Data Mode network, and otherwise keeps off them and waits for Wi-Fi. The download runs in a
