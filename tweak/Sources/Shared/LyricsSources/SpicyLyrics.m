@@ -236,7 +236,6 @@ static NSString *catalogueName(NSString *source) {
 // source named unknown where the reply names none it knows.
 static SGLyricsCredit *creditFor(NSDictionary *body) {
     SGLyricsCredit *credit = [SGLyricsCredit new];
-    credit.required = YES;
     NSString *source = stringIn(body[@"source"]);
     if (![source isEqualToString:@"spicy_lyrics"]) {
         NSString *catalogue = catalogueName(source);
