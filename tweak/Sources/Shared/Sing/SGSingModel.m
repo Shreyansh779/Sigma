@@ -66,6 +66,9 @@ static NSURL *singFolder(void) {
         if ([files fileExistsAtPath:earlier.path] && ![files fileExistsAtPath:made.path]) {
             [files createDirectoryAtURL:made.URLByDeletingLastPathComponent withIntermediateDirectories:YES attributes:nil error:nil];
             [files moveItemAtURL:earlier toURL:made error:nil];
+        } else if ([files fileExistsAtPath:earlier.path]) {
+            // Sigma/Sing was made first (a download begun before the move): the earlier folder is a second copy.
+            dispatch_async(dispatch_get_global_queue(QOS_CLASS_UTILITY, 0), ^{ [files removeItemAtURL:earlier error:nil]; });
         }
         folder = made;
     });
@@ -129,7 +132,12 @@ static void load(void) {
     sg_installed = YES;
     for (int i = 0; i < kFileCount; i++)
         sg_installed &= sizeAt([installedModel() URLByAppendingPathComponent:pathOf(i)]) == kFiles[i].size;
-    if (sg_installed) return;
+    if (sg_installed) {
+        // Left by a download that was stopped or replaced: its files and resume data are no use once the model is in.
+        NSURL *left = staging();
+        dispatch_async(disk(), ^{ [NSFileManager.defaultManager removeItemAtURL:left error:nil]; });
+        return;
+    }
     for (int i = 0; i < kFileCount; i++) {
         sg_done[i] = sizeAt(stagedFile(i)) == kFiles[i].size;
         sg_bytes[i] = sg_done[i] ? 0 : [[NSDictionary dictionaryWithContentsOfURL:resumeFile(i)][@"bytes"] longLongValue];
