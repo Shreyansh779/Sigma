@@ -419,6 +419,9 @@ static void *playerLoop(void *unused) {
         dispatch_time_t wait = idle ? DISPATCH_TIME_FOREVER : dispatch_time(DISPATCH_TIME_NOW, (int64_t)(quietAfter() * NSEC_PER_SEC));
         dispatch_semaphore_wait(sg_wake, wait);
         @autoreleasepool {
+          // Core Haptics raises, rather than returns an error, for a player whose engine the system has stopped
+          // under it (stopAtTime: on the rumble did, and killed Spotify). The engine is rebuilt on the next event.
+          @try {
             double now = hostSeconds(mach_absolute_time());
             if (!atomic_load(&sg_listening)) {
                 atomic_store(&sg_tail, atomic_load(&sg_head));
@@ -454,6 +457,11 @@ static void *playerLoop(void *unused) {
                 stopEngine();
                 idle = YES;
             }
+          } @catch (NSException *exception) {
+            atomic_store(&sg_engineStopped, true);
+            atomic_store(&sg_tail, atomic_load(&sg_head));
+            SGLog(@"music haptics: Core Haptics raised %@, the engine starts over", exception.reason);
+          }
         }
     }
     return NULL;
