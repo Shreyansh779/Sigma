@@ -317,7 +317,7 @@ static UIColor *tintFor(SGRDownloadState state) {
         incoming.hidden = NO;
         incoming.alpha = 0;
         incoming.transform = small;
-        [UIView animateWithDuration:0.16 delay:0 options:UIViewAnimationOptionCurveEaseIn | UIViewAnimationOptionBeginFromCurrentState
+        [UIView animateWithDuration:0.16 delay:0 options:UIViewAnimationOptionCurveEaseOut | UIViewAnimationOptionBeginFromCurrentState
                          animations:^{
             outgoing.alpha = 0;
             outgoing.transform = small;

@@ -1219,9 +1219,14 @@ typedef struct {
     [NSObject cancelPreviousPerformRequestsWithTarget:self selector:@selector(followSong) object:nil];
     if (!_browsing) return;
     _browsing = NO;
-    [UIView animateWithDuration:0.7 delay:0 usingSpringWithDamping:0.9 initialSpringVelocity:0
-                        options:UIViewAnimationOptionAllowUserInteraction
-                     animations:^{ self->_scroll.contentOffset = CGPointZero; } completion:nil];
+    void (^back)(void) = ^{ self->_scroll.contentOffset = CGPointZero; };
+    if (SGRReduceMotion()) {
+        [UIView animateWithDuration:0.25 delay:0 options:UIViewAnimationOptionCurveEaseOut | UIViewAnimationOptionAllowUserInteraction animations:back completion:nil];
+    } else {
+        [UIView animateWithDuration:0.7 delay:0 usingSpringWithDamping:0.9 initialSpringVelocity:0
+                            options:UIViewAnimationOptionAllowUserInteraction
+                         animations:back completion:nil];
+    }
     [self placeLinesAnimated:YES];
 }
 
@@ -1615,13 +1620,20 @@ typedef struct {
         view.transform = transform;
         return;
     }
+    void (^move)(void) = ^{
+        view.center = center;
+        view.transform = transform;
+    };
+    // Reduce Motion: the lines still travel to follow the song, but together, on a short ease-out with no spring.
+    if (SGRReduceMotion()) {
+        [UIView animateWithDuration:0.25 delay:0 options:UIViewAnimationOptionCurveEaseOut | UIViewAnimationOptionBeginFromCurrentState | UIViewAnimationOptionAllowUserInteraction
+                         animations:move completion:nil];
+        return;
+    }
     NSTimeInterval delay = below > 0 ? MIN(0.3, below * 0.04) : 0;
     [UIView animateWithDuration:0.7 delay:delay usingSpringWithDamping:0.86 initialSpringVelocity:0
                         options:UIViewAnimationOptionBeginFromCurrentState | UIViewAnimationOptionAllowUserInteraction
-                     animations:^{
-        view.center = center;
-        view.transform = transform;
-    } completion:nil];
+                     animations:move completion:nil];
 }
 
 // The sung line rests at the anchor and the rest stack around it; lines below it follow a beat
