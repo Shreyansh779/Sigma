@@ -1,8 +1,9 @@
 #import "SGLog.h"
 #import "SGPrefs.h"
 
-// Kept short: a log past this size is started again at the next launch.
-static const unsigned long long kLogLimit = 512 * 1024;
+// Kept short: a log past this size is moved to log.old.txt (replacing the one before) and started again at the
+// next launch, so a crash right after the switch still has the run-up to it.
+static const unsigned long long kLogLimit = 5 * 1024 * 1024;
 
 BOOL SGDebugLog(void) {
     static BOOL on;
@@ -23,7 +24,11 @@ void SGLogToFile(NSString *line) {
         [NSFileManager.defaultManager createDirectoryAtPath:folder withIntermediateDirectories:YES attributes:nil error:nil];
         path = [folder stringByAppendingPathComponent:@"log.txt"];
         NSDictionary *attributes = [NSFileManager.defaultManager attributesOfItemAtPath:path error:nil];
-        if (attributes.fileSize > kLogLimit) [NSFileManager.defaultManager removeItemAtPath:path error:nil];
+        if (attributes.fileSize > kLogLimit) {
+            NSString *old = [folder stringByAppendingPathComponent:@"log.old.txt"];
+            [NSFileManager.defaultManager removeItemAtPath:old error:nil];
+            [NSFileManager.defaultManager moveItemAtPath:path toPath:old error:nil];
+        }
         NSString *mark = [NSString stringWithFormat:@"---- launch %@ ----\n", NSDate.date];
         NSFileHandle *handle = [NSFileHandle fileHandleForWritingAtPath:path];
         if (handle) {
