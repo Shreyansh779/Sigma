@@ -12,6 +12,7 @@
 #import "Shared/Lyrics/Lyrics.h"
 #import "Shared/Player/PlayerState.h"
 #import "NowPlayingBar.h"
+#import "Redesigned/Kit/SGRKit.h"
 
 // A swipe that goes this far across, or is let go of this fast, skips.
 static const CGFloat kCommitFraction = 0.25;
@@ -209,9 +210,8 @@ static __weak SGRMiniPlayer *sg_miniPlayer;
     }
     [self showPaused:!paused];
     _play.transform = CGAffineTransformMakeScale(0.8, 0.8);
-    [UIView animateWithDuration:0.35 delay:0 usingSpringWithDamping:0.5 initialSpringVelocity:0 options:UIViewAnimationOptionAllowUserInteraction animations:^{
-        self->_play.transform = CGAffineTransformIdentity;
-    } completion:nil];
+    // The press token's bounce; under Reduce Motion it runs at once, so the dip is never drawn.
+    SGRAnimate(SGRMotionPress, ^{ self->_play.transform = CGAffineTransformIdentity; }, nil);
     id result = paused ? [player resume:nil] : [player pause:nil];
     SGLog(@"mini player: %@ -> %@", paused ? @"resume" : @"pause", result);
 }
@@ -250,11 +250,11 @@ static __weak SGRMiniPlayer *sg_miniPlayer;
             CGFloat vx = [pan velocityInView:self].x;
             BOOL far = fabs(dx) > width * kCommitFraction, flung = fabs(vx) > kCommitVelocity && dx * vx > 0;
             if (dx != 0 && (far || flung)) [self skip:dx < 0];
-            else [self settle];
+            else [self settleWithVelocity:vx];
             break;
         }
         default:
-            [self settle];
+            [self settleWithVelocity:0];
     }
 }
 
@@ -262,25 +262,44 @@ static __weak SGRMiniPlayer *sg_miniPlayer;
 - (void)skip:(BOOL)next {
     CGFloat width = self.bounds.size.width;
     CGFloat out = next ? -width : width;
-    [UIView animateWithDuration:0.18 delay:0 options:UIViewAnimationOptionCurveEaseIn | UIViewAnimationOptionBeginFromCurrentState animations:^{
+    void (^leave)(void) = ^{
         self->_content.transform = CGAffineTransformMakeTranslation(out, 0);
         self->_content.alpha = 0;
-    } completion:^(BOOL finished) {
+    };
+    void (^left)(BOOL) = ^(BOOL finished) {
         id<SPTPlayer> player = SGKaraokePlayer();
         SEL command = next ? @selector(skipToNextTrackWithOptions:) : @selector(skipToPreviousTrackWithOptions:);
         id result = [player respondsToSelector:command] ? (next ? [player skipToNextTrackWithOptions:nil] : [player skipToPreviousTrackWithOptions:nil]) : nil;
         SGLog(@"mini player: swipe %@ -> %@ (player %@)", next ? @"next" : @"previous", result, player ? NSStringFromClass([(id)player class]) : @"nil");
         self->_content.transform = CGAffineTransformMakeTranslation(-out * 0.4, 0);
-        [self settle];
-    }];
+        [self settleWithVelocity:0];
+    };
+    // Leaving starts fast (ease-out): the finger has already set it going.
+    if (SGRReduceMotion()) {
+        [UIView performWithoutAnimation:leave];
+        left(YES);
+        return;
+    }
+    [UIView animateWithDuration:0.18 delay:0 options:UIViewAnimationOptionCurveEaseOut | UIViewAnimationOptionBeginFromCurrentState animations:leave completion:left];
 }
 
-- (void)settle {
-    [UIView animateWithDuration:0.45 delay:0 usingSpringWithDamping:0.85 initialSpringVelocity:0
-                        options:UIViewAnimationOptionBeginFromCurrentState | UIViewAnimationOptionAllowUserInteraction animations:^{
+// Back to rest on a spring that carries the finger's sideways speed (points per second), so a drag let go
+// of short of skipping does not stall where the finger left it. At once under Reduce Motion.
+- (void)settleWithVelocity:(CGFloat)vx {
+    void (^rest)(void) = ^{
         self->_content.transform = CGAffineTransformIdentity;
         self->_content.alpha = 1;
-    } completion:^(BOOL finished) {
+    };
+    if (SGRReduceMotion()) {
+        [UIView performWithoutAnimation:rest];
+        _swiping = NO;
+        return;
+    }
+    // initialSpringVelocity is in fractions of the distance still to travel per second.
+    CGFloat from = _content.transform.tx;
+    CGFloat carried = from != 0 ? MIN(MAX(-vx / from, 0), 8) : 0;
+    [UIView animateWithDuration:0.45 delay:0 usingSpringWithDamping:0.85 initialSpringVelocity:carried
+                        options:UIViewAnimationOptionBeginFromCurrentState | UIViewAnimationOptionAllowUserInteraction animations:rest completion:^(BOOL finished) {
         if (finished) self->_swiping = NO;
     }];
 }
