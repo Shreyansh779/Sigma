@@ -88,8 +88,7 @@ static UIButton *controlButton(NSString *symbol, CGFloat size, NSString *label, 
     // The player's own field behind the screen, so the colors carry over from the portrait player.
     _field = [[SGRArtworkField alloc] initWithFrame:self.view.bounds];
     _field.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
-    _field.warpLook = SGRPlayerFluidLook();
-    _field.motion = SGRFieldMotionWarp;
+    _field.fluid = YES;
     NSString *identity = nil;
     UIImage *art = SGRNowPlayingArtwork(NULL, &identity);
     if (art) [_field setArtwork:art identity:identity animated:NO];

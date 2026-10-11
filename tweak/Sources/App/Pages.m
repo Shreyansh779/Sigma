@@ -88,23 +88,22 @@ UIViewController *SGLyricsSettingsPage(void) {
 UIViewController *SGPlayerSettingsPage(void) {
     BOOL native = !SGRedesignedUIStored();
 
-    NSMutableArray<SGModSection *> *sections = [NSMutableArray array];
-    NSMutableArray<SGModRow *> *pages = [NSMutableArray array];
+    // AirPods gestures, the lock screen widget and Vibrations have rows of their own on Mod Settings' main page.
+    NSMutableArray<SGModSection *> *sections = [NSMutableArray arrayWithObject:SGSection(nil, @[
+        SGWithTile(SGPageRow(@"Gestures", ^UIViewController *{ return SGGesturesSettingsPage(); }), @"hand.tap", UIColor.systemBlueColor),
+    ])];
     if (native) {
-        [pages addObject:SGWithSymbol(SGPageRow(@"Now playing bar", ^UIViewController *{ return SGNowPlayingBarSettingsPage(); }), @"rectangle.bottomthird.inset.filled")];
-        [pages addObject:SGWithSymbol(SGPageRow(@"Queue & devices", ^UIViewController *{ return SGQueueSettingsPage(); }), @"text.line.first.and.arrowtriangle.forward")];
+        [sections addObject:SGSection(nil, @[
+            SGWithTile(SGPageRow(@"Now playing bar", ^UIViewController *{ return SGNowPlayingBarSettingsPage(); }), @"rectangle.bottomthird.inset.filled", UIColor.systemPinkColor),
+            SGWithTile(SGPageRow(@"Queue & devices", ^UIViewController *{ return SGQueueSettingsPage(); }), @"text.line.first.and.arrowtriangle.forward", UIColor.systemIndigoColor),
+        ])];
+        [sections addObjectsFromArray:SGNativePlayerScreenSections()];
     }
-    // Double taps over the artwork, under either look.
-    [pages addObject:SGWithSymbol(SGPageRow(@"Gestures", ^UIViewController *{ return SGGesturesSettingsPage(); }), @"hand.tap")];
-    [pages addObject:SGWithSymbol(SGPageRow(@"Lock screen widget", ^UIViewController *{ return SGLockScreenWidgetPage(); }), @"lock")];
-    [sections addObject:SGSection(nil, pages)];
-    [sections addObjectsFromArray:native ? SGNativePlayerScreenSections() : SGRNowPlayingSections()];
-    // Vibrations hook Spotify's own controls and its audio, so they answer under either look.
-    [sections addObject:SGSection(nil, @[SGWithSymbol(SGPageRow(@"Vibrations", ^UIViewController *{ return SGVibrationsSettingsPage(); }), @"iphone.radiowaves.left.and.right")])];
     // Switch to video is the same chip of Spotify's player under either look.
     [sections addObject:SGSection(native ? nil : @"Hide on the player", @[
         SGHideRow(@"Switch to video", @"The chip over the title of a song with a music video", SGKeyHideVideoSwitch),
     ])];
+
     [sections addObject:SGNotedSection(@"Lossless", @[
         SGOptionRow(@"Lossless files", @"Your own FLACs in place of Spotify's stream", SGKeyLossless),
     ], @"Put FLAC or ALAC files in Files › Spotify › Lossless. A file plays when its title and length match the song "
@@ -112,5 +111,8 @@ UIViewController *SGPlayerSettingsPage(void) {
        @"streams its own copy, at its lowest quality while the next song has a file. Karaoke and speeds other than "
        @"1x keep Spotify's sound. Applies after you restart Spotify.")];
 
+    // The redesign's page leads with a card of its player and the background's control, the background's
+    // rows and the Mini player section under it.
+    if (!native) return SGRPlayerSettingsPage(sections);
     return [[SGModPage alloc] initWithTitle:@"Player" intro:SGRestartNote sections:sections footer:nil];
 }
