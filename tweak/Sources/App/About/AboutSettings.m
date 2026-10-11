@@ -32,6 +32,13 @@ static SGModRow *withSymbol(SGModRow *row, NSString *symbol) {
     return row;
 }
 
+// The welcome tour, and this version's What's new while the changelog has a section for it.
+static NSArray<SGModRow *> *whatsNewRows(void) {
+    NSMutableArray<SGModRow *> *rows = [NSMutableArray arrayWithObject:withSymbol(SGActionRow(@"Welcome tour", nil, ^{ SGShowOnboarding(); }), @"map")];
+    if (SGWhatsNewChanges().count) [rows addObject:withSymbol(SGActionRow(@"What's New", nil, ^{ SGShowWhatsNew(); }), @"sparkles")];
+    return rows;
+}
+
 // Which build this is, the app icon, the welcome tour and the reset.
 UIViewController *SGAboutPage(void) {
     SGModRow *reset = withSymbol(SGActionRow(@"Reset all settings", nil, ^{ confirmReset(); }), @"trash");
@@ -44,9 +51,7 @@ UIViewController *SGAboutPage(void) {
     SGModRow *appIcon = SGAppIconRow();
     if (appIcon) [sections addObject:SGSection(nil, @[withSymbol(appIcon, @"app")])];
     [sections addObjectsFromArray:@[
-        SGSection(nil, @[
-            withSymbol(SGActionRow(@"Welcome tour", nil, ^{ SGShowOnboarding(); }), @"map"),
-        ]),
+        SGSection(nil, whatsNewRows()),
         SGSection(@"For finding faults", @[
             SGHideRow(@"Debug log", @"Writes what the mod does, with touches and stalls, to Documents/Sigma/log.txt. Restart to apply", SGKeyDebugLog),
         ]),

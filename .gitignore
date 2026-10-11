@@ -18,3 +18,4 @@ tweak/Sources/Shared/Flags/SGFlagList.m
 harness/*/build/
 vendor/*/build/
 /video
+tweak/Sources/App/Onboarding/SGWhatsNewNotes.h

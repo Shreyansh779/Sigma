@@ -18,6 +18,8 @@
 #import "Diagnostics/SGHangSampler.h"
 #import "Redesigned/Kit/SGRKit.h"
 #import "Shared/Player/SpeedPitch.h"
+#import "Shared/Player/PlayerState.h"
+#import "Shared/LocalFiles/LocalFiles.h"
 #import "Player.h"
 
 // A sheet this soon after the ⋯'s tap is the player's.
@@ -665,6 +667,22 @@ static UIAction *speedAndPitchAction(SGRPlayerMenuTakeover *t) {
     return action;
 }
 
+// A local file's names and cover, edited in a sheet of the mod's own (Shared/LocalFiles): offered on the menu of
+// the track playing when it is one.
+static UIAction *editInfoAction(SGRPlayerMenuTakeover *t) {
+    NSString *uri = SGURIString(SGPlayerState().track.URI);
+    if (!uri || !SGLocalFileIs(uri)) return nil;
+    __weak SGRPlayerMenuTakeover *weak = t;
+    return [UIAction actionWithTitle:@"Edit info" image:symbol(@"pencil") identifier:nil handler:^(UIAction *sender) {
+        pick(weak, ^(SGRPlayerMenuTakeover *strong) {
+            UIViewController *player = strong.player;
+            finish(strong, @"Edit info opens its editor", ^{
+                if (player) SGLocalFilePresentEditor(player, uri);
+            });
+        });
+    }];
+}
+
 static UIMenu *menuFor(SGRPlayerMenuTakeover *t) {
     NSArray<SGRPlayerMenuSpotifyRow *> *rows = t.rows ?: @[];
     // Tiles in the Music app's order, Share last.
@@ -692,6 +710,8 @@ static UIMenu *menuFor(SGRPlayerMenuTakeover *t) {
         [tiles removeLastObject];
     }
     [main addObject:speedAndPitchAction(t)];
+    UIAction *editInfo = editInfoAction(t);
+    if (editInfo) [main addObject:editInfo];
     if (more.count == 1) {
         [feedback addObject:more.firstObject];
     } else if (more.count) {

@@ -21,3 +21,11 @@ void SGCheckCompatibilityOnce(void);
 SGModRow *SGAppIconRow(void);
 
 UIViewController *SGAboutPage(void);   // the Mod page
+
+// ChangeNotes.m: a Release Please changelog section as one line per change.
+@interface SGUpdateChange : NSObject
+@property (nonatomic, copy) NSString *kind;   // "Features", "Fixes", ... as the release names it
+@property (nonatomic, copy) NSString *text;
+@property (nonatomic, copy) NSString *url;    // the commit, nil for a line written by hand
+@end
+NSArray<SGUpdateChange *> *SGUpdateChangesIn(NSString *body);
