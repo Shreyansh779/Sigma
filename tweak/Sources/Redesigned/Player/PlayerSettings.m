@@ -25,6 +25,7 @@
 #import "Core/SGCore.h"
 #import "Settings/SGModPage.h"
 #import "Settings/SGPageStyle.h"
+#import "Settings/SGMarquee.h"
 #import "Redesigned/Kit/SGRKit.h"
 #import "Redesigned/Kit/SGRFluid.h"
 #import "Redesigned/NowPlayingBar/NowPlayingBar.h"
@@ -185,11 +186,6 @@ static NSArray<NSString *> *backgroundNotes(void) {
 // appears again. A clip is looked up only while the card is in a window.
 - (void)reloadBackgroundAnimated:(BOOL)animated {
     SGRPlayerBackgroundKind kind = SGRPlayerBackground();
-    __weak SGRPlayerShowcase *weakSelf = self;
-    void (^arrived)(void) = !self.window ? nil : ^{
-        SGRPlayerShowcase *showcase = weakSelf;
-        if (showcase.window && !showcase->_motion && SGRPlayerBackground() == SGRPlayerBackgroundAnimated) [showcase reloadBackgroundAnimated:YES];
-    };
     void (^apply)(void) = ^{
         self->_field.flows = kind == SGRPlayerBackgroundColours;
         self->_field.fluid = kind >= SGRPlayerBackgroundFluid;

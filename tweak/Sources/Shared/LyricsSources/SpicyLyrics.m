@@ -42,16 +42,17 @@ static NSDictionary *keyQuery(void) {
 // The key Sigma kept in the settings before it lived in the Keychain: moved there once, and taken out of the
 // settings, which a backup or a reset would carry.
 static NSString *const kEarlierKey = @"sigma.spicylyrics.key";
+// ...and what it was called before the project was renamed.
+static NSString *const kEarliestKey = @"spotipw.spicylyrics.key";
 
 static NSString *storedKey(void) {
     static dispatch_once_t once;
     dispatch_once(&once, ^{
         NSUserDefaults *store = NSUserDefaults.standardUserDefaults;
-        NSString *earlier = [store stringForKey:kEarlierKey];
+        NSString *earlier = [store stringForKey:kEarlierKey] ?: [store stringForKey:kEarliestKey];
         if (!earlier.length) return;
         storeKey(earlier);
-        [store removeObjectForKey:kEarlierKey];
-        [store removeObjectForKey:@"sigma.spicylyrics.refused"];
+        for (NSString *key in @[kEarlierKey, kEarliestKey, @"sigma.spicylyrics.refused", @"spotipw.spicylyrics.refused"]) [store removeObjectForKey:key];
     });
     NSMutableDictionary *query = [keyQuery() mutableCopy];
     query[(__bridge id)kSecReturnData] = @YES;
