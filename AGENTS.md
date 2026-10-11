@@ -16,7 +16,7 @@ A Theos tweak (Objective-C + Logos) injected into the decrypted Spotify iOS app.
   throughout, and its own accent colour. No native tweak runs.
 
 Anything that doesn't draw on Spotify's screens works the same under both: privacy, lyrics
-sources, flags, Vibrations and Speed and pitch. Those
+sources, flags, Vibrations, Speed and pitch, Sing, Lossless and local files. Those
 last two were the redesign's until they moved to `Shared/`, so their keys lost the `.redesign.` and
 `Core/SGPrefs.h`'s `SGMigrateKey` carries the old ones over at launch.
 
@@ -69,8 +69,8 @@ Rules:
   `SGLikelyWorksSpotifyVersions()` what ran cleanly in a short test (9.1.90). A version in none of them gets
   the "isn't supported" alert and red row (`App/About/Compatibility.m`), so a bump without it warns
   everyone. Update the README (badge and text), `.github/ISSUE_TEMPLATE/bug_report.yml`,
-  the iOS floor above and the web's `content/site.ts` with it. `Shared/Audio/SGAudioSourceQueue.m` pins
-  the 9.1.78 binary by UUID and offsets and stands down on any other until they are read off again.
+  the iOS floor above and the web's `content/site.ts` with it. The hooks on 9.1.88 and 9.1.90 were not
+  all swept against a class dump: `Redesigned/Player/PlayerMorph.x` still runs the 9.1.78 transition.
 - Known traps: anything pushed onto Spotify's nav stack must conform to `SPTPageController`
   (`Settings/SGPage.m`). Setting `hidden` on views inside Spotify's `OverflowStackView` or its Encore
   stacks crashes, so use alpha. A `CADisplayLink` capped at 60 Hz drags the player's 120 Hz

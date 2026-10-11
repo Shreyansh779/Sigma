@@ -73,18 +73,33 @@ Shared:
     Flags/        Spotify's remote-config flags: the provider hook, the generated table, the All flags page
     Lyrics/       the lyrics engine for the redesign's Apple Music style lyrics and the lock screen: lines read from
                   color-lyrics and the player's clock (KaraokeSource.x), words timed by estimate inside Spotify's line
-                  times (KaraokeTiming.m), which line to name where two voices sing at once (the one that came in first,
-                  for the lock screen), and the Lyrics page's parts
+                  times (KaraokeTiming.m, which splits Thai, Lao, Khmer and Burmese at the system's dictionary words), which line to name where two voices sing at once (the one that came in first,
+                  for the lock screen and the Live Activity), a line in another alphabet in Latin letters, offline by Apple's
+                  transforms, kanji read the Japanese way in a song with kana (Romanise.m; checked on the simulator by
+                  harness/lyrics' -romanise), and the Lyrics page's parts. Lines are kept in time order
+                  whatever order a source lists them in. The Lyrics page's Delay (Timing, 0 to 1000 ms, either look)
+                  shows every line that much later than the song, for Bluetooth headphones: whatever times lines
+                  against the position takes it off first (the redesign's lyrics view and its word sweep, the lock
+                  screen's line and artwork, the Live Activity, the native look's lyrics page for local files), and a
+                  tap on a line seeks to its start plus the delay. Karaoke's audio, the scrubber and the lyrics preview
+                  are left alone. It is read at every use, so a change applies at once (checked by harness/lyrics' -check). With EeveeSpotify injected (SGEeveeSpotifyInjected), its lyrics
+                  answer Spotify's requests and the mod's sources and its own requests stand aside
     LyricsSources/ the sources lyrics come from, asked in the order the Lyrics page puts them in and merged into the
                   best answer (LyricsSources.m, the list to drag in LyricsSourcesPage.m): Apple Music's TTML from
-                  BiniLyrics.m and Unison.m, read by SGTTML.m, which carries a second voice and the
-                  backing vocals, and in its head Apple's translation and its pronunciation of a line, the pronunciation
-                  timed word by word (the translation taken in the Lyrics page's language); SpicyLyrics.m, the Spicy
-                  Lyrics developer platform's GET /v1/lyrics/{id}, matched by Spotify's track id and asked with a
-                  publishable key of the user's own (see Spicy Lyrics below), carrying syllables, backing vocals, a
-                  duet's sides and the credit its terms require; Musixmatch.m, matched by
+                  BiniLyrics.m (now lrc.red: first the TTML filed under Spotify's ISRC for the track, from
+                  SGSpotifyISRC in Haptics/SystemMusicHaptics.x, else its search by name) and Unison.m, read by SGTTML.m,
+                  which carries a second voice and the backing vocals, and in its head Apple's translation and its
+                  pronunciation of a line, each keyed to the line by its itunes:key or lrc:key, the pronunciation
+                  timed word by word (the translation taken in the Lyrics page's language); Musixmatch.m, matched by
                   Spotify's track id with an anonymous token, word timed where it has richsync; NetEase.m, word timing from yrc for what the others only line time; LrcLib.m, open and
-                  keyless and timed by the line, the floor under the rest. color-lyrics is answered with whichever won
+                  keyless and timed by the line, the floor under the rest. SpicyLyrics.m, Spicy Lyrics' Developer Platform
+                  by track id on the user's own publishable key (Keychain), syllable timed where it has a sync, with
+                  its pronunciations and translations; its credit, which its terms require, shows whatever Show source
+                  says and opens the uploader's and maker's pages from a tap (both looks), its answers and misses are
+                  kept per track, a rate limit is waited out and a refused key is left for 10 min, its reason on the
+                  source's row; checked on the Mac against harness/spicy-lyrics/. QQMusic.m (line timed LRC) and KuGou.m (word timed KRC, unpacked with
+                  zlib and read by NetEase.m's parser) for Chinese and other Asian songs, matched by title, singer
+                  and length; checked on the Mac against harness/lyrics-sources/. color-lyrics is answered with whichever won
                   (LyricsHook.x): Spotify's own 200 gets our lines swapped in; a track Spotify's metadata says has none has
                   its request sent to a donor track that does, so the reply is a real 200 (a 404 answered as a 200 in the
                   delegate alone never showed the card on 9.1.78); a 404 for a track not seen yet is held until the chain
@@ -92,27 +107,21 @@ Shared:
                   Spotify has lyrics for, so one is added to any list without it: that is what makes the player ask for the
                   lyrics and show the card. has_lyrics is forced on for every track, the walk starts at the track change
                   for it and the next, and the player's card-loading timeout flag is forced to its 5 s maximum while a
-                  source is on. None of it runs while EeveeSpotify is injected with its own lyrics on (SGLyricsActive()):
-                  its hook on the same delegate calls blocks on a lyrics fetch, and LyricsHook calls it from the main
-                  queue. The Lyrics page says so
-    LockScreenLyrics/ the line being sung in the system's now playing
-    LockScreenArtwork/ the track's Canvas or its album's Apple Music cover as the lock screen's animated
-                  artwork, from iOS 26 (Apple takes an MPMediaItemAnimatedArtwork under one of
-                  MPNowPlayingInfoCenter's animated artwork keys, and the mod puts one there through a second
-                  hook on setNowPlayingInfo:, so the lock screen lyrics' rewrites of the same dictionary carry
-                  it). The sources are asked in the user's order (Spotify, then Apple Music until set, on the
-                  shared Settings/SGOrderPage the lyrics sources use too). Spotify's URL comes off canvas.url
-                  in the played track's metadata, which Spotify's core fills whatever
-                  ios-feature-canvas.canvas_enabled says, and failing that from spotify.canvaz.cache with the
-                  account's own token. Apple Music's (SGAppleArtwork.m) comes from the catalog search with
-                  editorialVideo extended, under the web player's token read from music.apple.com's script and
-                  kept until it expires; the HLS stream near 1100 px wide, HEVC first, is byte ranges of one
-                  MP4, which is fetched whole. The clip is downloaded into Caches, centre cropped once to the
-                  shape the key wants (Apple's 3:4 cover needs none) and kept under a 120 MB cap. The
-                  redesigned player's Animated artwork asks the same sources (SGArtworkAsk) in an order of its
-                  own; a search or a download both ask for at once is made once and answers both. Checked on
-                  the Mac against harness/lockart/
-    Navigation/   the page transition fix (PageTransition.x) and opening a spotify: link (Links.x)
+                  source is on. In the redesign, with a translation language chosen, lines kept for the lyrics view with
+                  no translation of their own take Musixmatch's community translations (Musixmatch.m), whichever
+                  source won, Spotify's own included: matched by the line's folded text, as copies kept in place of the
+                  lines (KaraokeSource.x), which the view picks up
+    LockScreenLyrics/ the line being sung in the system's now playing, and on iOS 26 the lyrics as the lock screen's
+                  full-screen artwork (LyricsArtwork.x): a new artwork ID per line, its 3:4 H.264 clip (the line and the
+                  next one dimmed over the blurred cover, SGLyricsClip.m) written only when the lock screen asks for it,
+                  Still (one frame) or Animated (15 fps). The backdrop is blurred small and drawn large, on the CPU as the
+                  lock screen asks in the background; previews are drawn on a queue apart from the clips, and while the
+                  lock screen is asking, the next line's preview and clip are drawn ahead and a ready preview is handed
+                  over at once. iOS still shows the plain cover for about half a second at each change of artwork. Picking it or another artwork applies at once. Rendered on the Mac against harness/lyrics-clip/. What reaches the
+                  system's now playing through this hook and Player/NowPlayingExtras.x is checked by harness/now-playing/
+    Navigation/   the page transition fix (PageTransition.x), opening a spotify: link (Links.x), and either look's
+                  Add a Tab sheet (AddTabSheet.m) with the icons a tab can wear, Encore's glyphs or SF Symbols
+                  (TabIcons.m). The sheet runs in the simulator in harness/addtab/
     ConnectDiscovery/  Bonjour resolves local Spotify Connect receivers. When Spotify's own mDNS send
                   fails without the multicast entitlement, a bounded round sends its query by IPv4/IPv6
                   unicast to all resolved receivers and replays validated replies to Spotify's socket.
@@ -120,41 +129,209 @@ Shared:
                   The IPA declares Connect and Google Cast Bonjour service types; pipeline.sh keeps the
                   IPA's existing types. This bridge handles Connect only; Cast is Bonjour-declared but
                   has no equivalent packet bridge here.
-    Audio/        the mixer connection and RemoteIO render notify owned once (SGAudioPipeline.x): fixed processor slots
-                  run speed and pitch, audio effects, then music haptics. Spotify keeps an output chain per sample rate
-                  (a local file at another rate gets its own), so each RemoteIO pulls only its own mixer and the
-                  processors follow the one connected or started last. Graph changes and disposal exclude active pulls;
-                  the render thread never waits for them. Unsupported formats retain Spotify's connection. The PCM
-                  packet queue is bounded and generation-stamped. Sing's source read-ahead reads guarded queue metadata
-                  for the verified Spotify binary; PCM still comes through its AudioUnit. Boundary tests are in harness/audio/ and harness/sing/
-    Sing/         the local Core ML separator, source-domain audio adapter, worker and player lifecycle, from iOS 27. Core ML
-                  uses the GPU in the foreground and its warm CPU model in the background. The audible
-                  clock follows emitted source samples while delayed audio drains. Model loading overlaps source capture;
-                  verified continuous next-track PCM keeps its worker and reserve across a natural transition.
-                  Redesigned/Lyrics owns the Now Playing microphone control and Mod Settings' Karaoke page. The voice
-                  model (about 470 MB) is not in the IPA: SGSingModel.m downloads its files from the model host in a
-                  background URL session, checks each against a size and a SHA-256 pinned in the code, and moves
-                  them into Application Support/Sigma/Sing only when all are right (SingModel.x reconnects at
-                  launch). Tested against harness/sing/ (the download against a local server, model_test.py)
+    Sing/         Karaoke (Sing in the code and its keys), a song's vocals turned down while it plays (Sing.h lists
+                  its files): one voice model (Mel-Band RoFormer, MIT, exported by Vitrine for the Neural Engine and
+                  palettized to 6 bits: separator-ane.mlmodelc, 210 MB, from Hugging Face; on a FLEX build a copy in
+                  Sing/dev/ comes first) downloaded and checked file by file over Wi-Fi unless cellular is allowed,
+                  a stop keeping what came in for the next download to carry on from; the 489 MB model downloaded
+                  before is kept and loaded on the CPU alone until this one is in (the Voice model row then reads
+                  Update available), and deleted as its download ends or at a launch that finds both
+                  (SGSingRemoveOldModel, which logs the space freed), Sing moving to the new one at its next load;
+                  loaded only while Spotify
+                  is active (SGSingLoader.m), on any iPhone with iOS 18, a CPU copy first and warmed, only with 1 GB left to the
+                  process (no floor on the iPhone's memory: both copies warm add 0.1 GB of footprint), then on Automatic, where the iPhone has a
+                  Neural Engine, a Neural Engine copy of the same model beside it, which takes every window once it is
+                  in, in the background too, each load with a deadline and kept a minute after the mic goes off; the
+                  Neural Engine copy loads only with 0.5 GB left to the process, its first load after every install
+                  compiling it for up to ten minutes while Karaoke runs on the CPU (while it loads, the CPU's falling
+                  behind spends none of the 8 s after which Karaoke gives a song up, nor counts toward its three in a
+                  row), unless Prepare after updates (on by default) compiled it already: with the model in and the mic off, 15 s after
+                  Spotify comes to the front and below the thermal state Serious, the Neural Engine copy alone loads once for this
+                  iOS and install and is let go (22 s on a fair iPhone 15 Pro, 48-65 s on a serious one; a want meanwhile takes that
+                  load over), so the mic's copy loads in 0.3 s; Karaoke's status reads "On, Neural Engine" or "On, CPU", and "Off ·
+                  preparing for the Neural Engine" while it compiles ahead, and it is dropped for the launch, the CPU copy carrying on, once it fails to load, warm up or
+                  run a window (one that falls behind keeps its place); Runs on is Automatic or CPU only, the GPU and
+                  Neural Engine choices stored before read as Automatic; the STFT around it on Accelerate,
+                  and an engine that stands in Speed and pitch's chain between Spotify's mixer and its output
+                  (SGPlayerSetStage), pulls the mixer a few seconds ahead of what plays, never past sound Spotify has not
+                  decoded yet (a part of a pull ahead its mixer marks silent is left out of the lead and read again at the
+                  next render, so a slow network fills the lead more slowly and a stall plays through on it; "sing: read
+                  ahead:" in the log, the first three times and then a count a minute), separates two-second windows
+                  there on a worker thread and mixes the vocals down on the render thread. Spotify's clock has the lead
+                  taken off (SPTPlayerState's positionAsOfTimestamp): the lead held when that line of the clock began
+                  (the same position run on at the same speed, however often a state is stamped again), less what was
+                  dropped since, as the player reports on a change and not as it plays (SGSingLeadOf, read by every
+                  correction); run on (-position), the lead comes off after running on and never below 0, so a track
+                  reached as the last one ends, reported while the lead still holds that end, stays at 0 until its first
+                  frame plays rather than running on from the title change (every 5 s a "sing: clock:" log line sets Spotify's clock against what the engine pulled
+                  and played, and every lyrics seek logs where it was sent and where it landed), and a seek, a skip or a stop drops it.
+                  Until the seek or skip lands (Spotify reports the target or the new track, or 5 s pass) nothing is
+                  read ahead, as Spotify's mixer still hands over what came before it; the queue's next track arriving
+                  up to 12 s early is crossfade and keeps the lead, another track arriving early drops it; on the
+                  queue's last track (no next, no repeat) the lead drains at half speed so it has played out a second
+                  before Spotify's decoder reaches the end (SGSingEngineSetLeadCap). Not separating (stopped, held, resting at As sung,
+                  standing aside), the engine plays the lead it holds on as it is, dry, the clock still corrected, so no
+                  part of the song is skipped; it lets it go at a pause, where Sing.x seeks Spotify back to what was
+                  heard (and so when the headphones it played on go), or with a seek, a skip or the output stopping, and builds one only when it separates.
+                  Karaoke stands aside, the model kept, over AirPlay, for what is not a song, and while Spotify plays
+                  but its output has not rendered for 3 s (Connect to another device: "Not on this iPhone"); an
+                  interruption (a call, Siri, another app's audio) holds the worker and keeps the lead until iOS says it
+                  ended or the sound comes back, Spotify deciding whether to resume. At As
+                  sung with Spatial voice off it rests (held as for the heat, the model kept a minute as for a mic
+                  switched off, "sing: rests" in the log) unless the Karaoke page's card is on screen with Spotify in
+                  front: its reads of its two lines (SGSingReadLevels; the card's traces, not the lyrics, which are no
+                  viewer) keep Karaoke separating the playing song, so the lines move and the slider is heard at once
+                  ("sing: separates again"), and a second after the page is popped, covered or in the background it
+                  rests again. From the
+                  thermal state Serious up Karaoke is held and lets the model go,
+                  unless Ignore heat warnings is on, and runs again at Fair. Spatial
+                  voice holds the separated vocals in front as the head turns: HeadGestures' motion gives the yaw off a
+                  front that follows the head (Back in front, 5 s unless set), and the render thread pans the vocals' middle at equal power,
+                  narrowed, with the far ear up to 0.65 ms late and low-passed; it stands down for iOS's own spatial
+                  audio. Its Sound section sets Distance (the voice down by the square root of the distance), Room
+                  (a wet-only AUReverb2 fed the voice's middle, emptied by a seek) and Instruments width (the rest's side
+                  scaled); off, all three leave the song exactly as it was. The Spatial voice page's preview (SGSpatialPreview.m) turns a disc of dots under the listener by
+                  the same front (SGSpatialVoiceAngle, SGSingEngine.h), on Core Animation alone and only while the page
+                  shows. The mic is on the redesign's lyrics (Redesigned/Lyrics/SGRSingButton.m). Tested on the Mac
+                  against harness/sing/ (the lead, its cap, a slow decoder, a track boundary, spatial voice and its front without the model: `build/sing spatial`; the
+                  model as both copies with `ane`, as the CPU's alone with `cpu`), the download against its download/
+                  (`update` for the old model kept until it, `dev` for the dev folder), the pages in the simulator against harness/spatial-page/
     Player/       the player's open and close announced (PlayerEvents.x), what the player is doing read through
-                  one hook for every feature that wants it (PlayerState.x), the lock screen widget's flags, and in the
+                  one hook for every feature that wants it (PlayerState.x), the last track played for the settings
+                  pages' previews to show when nothing plays (SGLastTrack.m), the lock screen widget's flags, and in the
                   more button's menu Speed and pitch: both done to Spotify's audio by Apple's time and pitch unit, put
-                  between its mixer and its RemoteIO unit through Audio/SGAudioPipeline's connection
-                  (SpeedPitchMenu.x, SpeedPitch.x, SGTimePitch.m). With Pitch follows speed on (the default, stored) the pitch
-                  slider folds away and Apple's varispeed takes the unit's place: the song resampled like a record, no
-                  time stretch to smear it. The block goes into Spotify's own context menu sheet
+                  between its mixer and its RemoteIO unit by taking over the connection Spotify makes between them
+                  (SpeedPitchMenu.x, SpeedPitch.x, SGTimePitch.m). Spotify runs a chain per sample rate, so a local
+                  file at another rate can have two RemoteIO units running at once: SpeedPitch.x keeps a record
+                  per unit (its own mixer, sample time, largest slice and formats; AudioOutputUnitStop and
+                  AudioComponentInstanceDispose rebound too, a disposed unit forgotten after its render in progress)
+                  and names one the music's (SGPlayerMusicOutput), the one Spotify started or connected last, or
+                  one with sound when that one has had none for a second; speed and pitch, Karaoke's stage, the audio
+                  effects and Music Haptics follow it (SGPlayerWatchMusicOutput), and the other plays as Spotify
+                  made it. A connection whose formats the callback cannot take (not float with a buffer per channel,
+                  more than two channels, or a mixer at another rate than the unit) gets Spotify's own connection
+                  back. Each start, stop and dispose is logged as `audio:` with its formats and where the processors
+                  are. Pitch follows speed (on until switched off,
+                  spotifyglass.speed.pitchFollows) plays the speed through Apple's Varispeed instead, faster and higher
+                  together like a record; Varispeed also carries 1x while it is on, so a return to normal speed changes
+                  nothing, and the stretch is left for pitch alone at 1x, the two swapped only through a reset. A new
+                  format on either side of the output while it runs (a route to another rate, Spotify handing it
+                  another one) makes the unit again for it, and until then the sound passes as it is. harness/speed's
+                  `two` runs a 44.1 and a 48 kHz chain at once. Under the
+                  sliders a Reverb slider sets the audio effects' reverb amount (spotifyglass.dsp.reverb.amount), turning
+                  the effects and the reverb on with it. The block goes into Spotify's own context menu sheet
                   and is drawn from its own measures, not the Kit's, so it sits there under either look. Tested on the
-                  Mac against harness/pitch/ and in the simulator against harness/speed/ and harness/menu/
+                  Mac against harness/pitch/ and in the simulator against harness/speed/ and harness/menu/. Under the
+                  redesign, with the player's background Fluid or Animated, a row under the block switches Animated
+                  artwork at once, through functions the redesign's PlayerMotion.x defines. The redesign shows that
+                  sheet as the system menu (Redesigned/ContextMenu), whose own items stand in for the block, so the
+                  block stays out of it unless the sheet itself is shown (SGPlayerMenuReplaced). Switch to video,
+                  the chip over the title of a song with a music video, is hidden under either look on request
+                  (VideoSwitch.x, spotifyglass.hide.videoSwitch), by its identifier in FloatingElementsUnit.
+                  The sleep timer (SleepTimer.m, set from the Live Activity) pauses Spotify at a time, at the end of
+                  the track or at the end of the album or playlist, the last track of it found by the tracks to come
+                  that are neither queued by hand nor autoplay's (SPTPlayerTrack's provider), or by the next one
+                  having played already when it repeats. Over the last seconds (the Live Activity page's Fade out: Off,
+                  10 s, 30 s, 1 minute or 2 minutes, 30 s unless picked; at the end of a track, over the whole track
+                  when it is shorter) it fades the sound 60 dB through a gain of the mod's own, applied by SpeedPitch.x's notify on the music's RemoteIO unit (never the system
+                  volume), and puts the gain back a second after the pause. Spotify's own timer, from the player's
+                  ⋯ menu, fades by the same choice and gain (SpotifySleepTimer.m): the core reports it in the player's
+                  state (SPTPlayerState's sleepTimer: type 1 at a timestamp, 2 at the end of the track), checked four
+                  times a second while Spotify plays; Spotify pauses, the gain is held down from its end until that
+                  pause and back a second later, at once on a cancel or a later time. It stands aside while the mod's
+                  own timer runs and while Spotify's own Fade out flag (its DuckHandlerImpl's duck) is forced on.
+                  Tested on the Mac against harness/sleep-timer/, the gain in the simulator against harness/speed/
     Haptics/      Vibrations (Haptics.h lists its files): a tap of UIKit's feedback generators for the player's and the now
-                  playing bar's controls, the scrubber's tenths and ends, cover swipes and the lyrics page's tap to
+                  playing bar's controls, the scrubber's tenths and ends, cover swipes, gestures and the lyrics page's tap to
                   seek, at the strength set for them (ControlHaptics.x, SGFeedback.m); and Music Haptics, Core Haptics
-                  playing along with the song: Audio/SGAudioPipeline supplies final samples after speed and pitch;
-                  in the unit's output format (the hardware's), they go through a drum
+                  playing along with the song: the music's RemoteIO output unit (SGPlayerMusicOutput, Shared/Player)
+                  gets a render notify, the samples, in the unit's output format (the hardware's), go through a drum
                   and bass analyzer on the render thread (SGMusicAnalyzer.m, plain C), and a thread of its own schedules
                   the taps and the rumble for when the sound is heard, at their strength and leaving out what Follows
                   leaves out (MusicHaptics.x). Everything applies at once; nothing plays while Spotify is not the active
-                  app. The analyzer is scored on the Mac against harness/haptics/, the hook in the simulator against its
-                  sim/, the settings against harness/haptics-page/
+                  app. Beside it, In the Background (iOS 18 and up) asks Spotify's extended-metadata for the track's
+                  ISRC with Spotify's own spclient headers, asks Apple Music's catalog for that ISRC (the phone's own country first, then the US), and names the
+                  matched song's catalog id (same ISRC, length within 2 s, a haptic track) or else the ISRC in the now
+                  playing info for iOS's own Music Haptics, which plays on the lock screen and in other apps too
+                  (SystemMusicHaptics.x, its pure steps in SGHapticTrack.m). Both may be on: while iOS reports the named song
+                  playing, the mod's own stays quiet, since iOS plays the track in front of Spotify too, and also while
+                  it asks (10 s at most) and for 3 s after a song is named; with no report by then, once iOS has none,
+                  while iOS's is paused in Control Center or in an install iOS does not list, the mod's own plays while
+                  Spotify is in front. The analyzer is
+                  scored on the Mac against harness/haptics/, as are the pure steps (build/track), the hook, the two
+                  switches, the stand-down and the move from the old choice in the simulator against its sim/, the
+                  settings against harness/haptics-page/
+    AnimatedArtwork/ moving artwork (AnimatedArtwork.h): the track's Canvas, else Apple Music's animated album cover
+                  (SGMotionCatalog.m: searched without the album's edition, the edition of the same name first, and
+                  left alone for 10 minutes after a 403 or 429; an album's answer kept on disk for a week, so a relaunch skips the search), kept as local files (SGMotionStore.m, a download that
+                  fails on the way tried once more), on iOS 26 the lock screen's full-screen
+                  artwork (LockScreenMotion.x). With Every song, a song with neither gets its cover over copies of it
+                  blurred and swaying, a seamless 8 s 3:4 loop drawn on the CPU only when the lock screen asks for it
+                  and kept per picture (SGFluidClip.m). Rendered on the Mac against harness/fluid-clip/. A track whose
+                  metadata names no Canvas has it asked of Spotify's Canvas service (MotionSources.m); each track is
+                  looked up again when its Canvas comes in a later state, and the next track's clip is fetched ahead
+                  (SGMotionFollower.m). The lock screen takes a clip under a key the system lists, cut to that key's
+                  shape when it is not, with its still filled to the size asked (SGMotionClip.m), and a change of the
+                  choice applies at once, but to or from Lyrics. The cut and the service's wire format are checked on
+                  the Mac against harness/motion/
+    LocalFiles/   local files (LocalFiles.h lists its files): Edit info in the player's ⋯ menu, the table's footer
+                  under Speed and pitch, which closes the menu and opens a form sheet (the three names, the cover
+                  with a menu to change it, Restore file's info; nothing is stored before Save, and a swipe away
+                  with changes asks first), storing a title, artist, album and cover by the file's URI and laying them
+                  over -[SPTPlayerTrack metadata] and the cover's image request (the redesign's artwork reads the
+                  stored cover itself, Redesigned/Kit/SGRBridges.x); the file is never written. Their
+                  lyrics are kept under the URI and asked of the sources by name, since Spotify never asks for them;
+                  with no source switched on, of LRCLIB alone, which then gets the file's title, artist, album and
+                  length. A rename gives a new key (a cover alone does not), asked for at once while the file plays.
+                  A miss is asked again a few times, in case it was a lost request. The user's own .lrc files
+                  (LocalLyrics.m), imported from Files on the Imported LRC files page under Lyrics' sources and kept
+                  as UTF-8 in Documents/Sigma/Lyrics, come before any source: a file linked to the local file
+                  playing (Import for current track) is its lyrics whatever its tags say, and any other is matched by
+                  [ti:] and [ar:], or a name of "Artist - Title", folded; an import or a delete has the engine forget
+                  what it kept for local files and ask again. SGImportedLRCAsk is the same as a source for the
+                  order, which moves it on top at the first import and at every link once LyricsSources lists it.
+                  Where Spotify's player shows its placeholder for a local file, the file's own cover is found
+                  (LocalCover.m) in the image fields of its metadata or, while the titles and artists agree, in the
+                  system's now playing artwork, which the lock screen shows; the native look puts it into the front
+                  cover's empty image view (Native/LocalFiles/LocalCover.x), the redesign's artwork bridge takes it
+                  as the picture of a local file whose metadata names none. A cover picked in Edit info wins.
+                  The model and the LRC reading are checked on the Mac against harness/local-files/, the row and
+                  the editor in the simulator against its sim/
+    AudioEffects/ the audio effects on Spotify's sound (AudioEffects.h has the keys and the page's calls): a render
+                  notify on the music's RemoteIO unit (SGPlayerMusicOutput, Shared/Player) runs each finished buffer through the mod's own engine, re-blocked to 1024 frames one block late,
+                  in place (AudioEffects.x, SGDSPEngine.m), then hands it, mixed to mono, to one reader that only
+                  reads it, switch on or off (SGAudioSetOutputReader: the player's Visualizer). The buffers are in the unit's output format, the
+                  hardware's, not the client format Spotify sets. The effects are the SGDSP*.m files, on Accelerate,
+                  Apple's Reverb2 unit, libbs2b and EEL2 (vendor/audio). Settings apply as they change, on a queue of
+                  its own; the file effects read their files from Documents/Sigma/Audio effects
+                  (AudioEffectsFiles.m). Presets and Headphones (AudioEffectsPresets.h lists their files): seven
+                  built-in presets over a reset that keep the Graphic EQ, the user's own as a copy of every dsp key, the
+                  settings from before the page's first pick saved as one of them, Before presets, and AutoEq's
+                  corrections, its INDEX.md fetched from GitHub and cached a month in Caches/Sigma/AutoEq, a
+                  headphone's GraphicEQ file put into the Graphic EQ (AutoEq.m), None taking it off; a pick turns the
+                  master switch on. A pick can be kept per output (spotifyglass.audioOutputs, by the port's UID): on
+                  every AVAudioSessionRouteChangeNotification to another output (AudioEffects.x), a remembered output
+                  gets its correction or None, and any other output takes off a correction that came on for one; a
+                  pick made with nothing remembered and a curve of the user's own stay, and the master switch is
+                  never touched. Checked on the Mac by `harness/audio-effects/build.sh route`.
+                  Tested on the Mac against harness/audio-effects/ and harness/autoeq/, the hook in the simulator
+                  against its sim/, the page against harness/audio-effects-page/
+    HeadGestures/ AirPods gestures (HeadGestures.h lists its files): CMHeadphoneMotionManager's attitudes, while the
+                  switch is on and Spotify plays, read for a double nod and a shake, each doing what its pull-down
+                  says: Nothing, back or forward 15 s, play or pause (which listens with the song paused too), next or
+                  previous track, shuffle, repeat, or Like, which adds the track to Liked Songs through Spotify's
+                  collection platform (addURL:showUIConfirmation:completion:); Like and Next track until changed. A
+                  tone played through Spotify's playback session confirms each, whatever the Ring/Silent switch says.
+                  Try it listens a few seconds and names in its row what it picked up, doing nothing to the song. A
+                  sheet teaches one's own nod and shake, five of each after a tone, a ring showing the head live (a dot
+                  that moves with it, ticks lighting toward where it went; SGHeadMotionListen) and five dots counting
+                  what landed, with Redo last; the threshold kept is the one that fires on all five but one at least, the nod
+                  stored before the shakes begin, so Cancel keeps it. Forget shows only while something is learned.
+                  The one CMHeadphoneMotionManager is lent to other features
+                  (SGHeadMotionListen: Karaoke's spatial voice), and runs for them with the switch off, the detector then
+                  unfed. The detector is
+                  tested on the Mac against harness/head-gestures/, the hook and the page in the simulator against its sim/
+    Gestures/     the double tap zones on the player: the grid, what each cell does, the recognizer (each look hooks it on)
 
 Native:
 
@@ -180,13 +357,28 @@ Redesigned:
                   go -- the field brightening into the page's colour, the rest fading in where it is, nothing
                   moving -- so it no longer arrives a piece at a time; after 1.2 s it shows whatever is missing, and
                   the back button, being the system's navigation bar, is there throughout
-    Navbar/       the glass tab bar (TabBar.x) over its own composition (Navbar.x, NavbarLayout.m) and editor, with the fade to
-                  black over the pages behind the bars that Spotify's bar drew; the glass search field.
+    Navbar/       the glass tab bar (TabBar.x) over its own composition (Navbar.x, NavbarLayout.m) and editor, the glass search field.
                   Spotify is made to leave the glass bar its height where its own bar is shorter (a phone with a home button,
-                  Offline or Private Session under the bar), so the now playing bar and the pages move up with it. Laid out on
-                  the Mac against harness/tabbar/
+                  Offline or Private Session under the bar), so the now playing bar and the pages move up with it. Under both
+                  bars the pages fade to half black (SGRBarFade, the stock bar's own subview). A page scrolled down
+                  minimizes the bar to two circles, the first or current tab and the last, with the now playing card
+                  between them, and a scroll back up, its top, another tab or the player brings it back
+                  (TabBarMinimize.x, MinimizeStep.h; the Player page's Apple Music style). Spotify's container is no
+                  UITabBarController, so UIKit's tabBarMinimizeBehavior and bottomAccessory cannot do it. The bars,
+                  their circles and the card move as one, on one spring of their own (SGRMotionBar, 0.26 s, no
+                  overshoot; at once under Reduce Motion), from what is on screen, so a change turned back half way
+                  carries on from there. Each glass tab carries its name for VoiceOver and the large content viewer, labels
+                  hidden or not, and the leading circle says it shows all tabs. Laid out on
+                  the Mac against harness/tabbar/ (`mini`; a tap on the leading circle `tap`, real flings that turn
+                  the bar half way `turns`, a minimize from inside Spotify's own animations `nested`, every frame of
+                  the move sampled `motion`), the scroll's steps checked by harness/tabbar/minimize-check.c
     NowPlayingBar/ the glass now playing bar (NowPlayingBar.x), with Spotify's device button on it hidden on request
-                  (BarConnect.x, its own key and its own row on the Player page, apart from the native look's)
+                  (BarConnect.x, its own key and its own row on the Player page, apart from the native look's). The card's text is the Music
+                  app's, the title over the artists with no device line, drawn inside Spotify's own text on each swipe page
+                  so it slides and fades with it; Spotify lays a page out as "title • artists" over the device line or as
+                  title over artists, and both are read. In the minimized row
+                  the card drops its device and add buttons, faded out as it heads there and back in as it leaves. Only the title stays in the row. In a Jam the
+                  glass stays on the track and Spotify's Jam strip gets a pane of its own above it (harness/tabbar/, jam)
     Player/       the redesigned full screen player (Player.h lists its files), on Spotify Free's units too (a Free
                   account with pick and shuffle gets NowPlayingReinventFreeMode, whose units are classes of their own
                   around the same elements, and each unit hook covers both); its ⋯ opens a menu the way the
@@ -264,6 +456,28 @@ which makes every unset switch read off, so a reset is stock Spotify whatever sw
 A hook reads its switch when it runs (`SGEnabled`, `SGHidden`, `SGFlag` from Core/SGPrefs.h), so a
 change shows after Spotify restarts; the tab editor on the Navbar page is the exception and applies as soon as the bar lays
 out again, as are the Home gradient's colour, strength and height, but not the switch that turns it on, and Vibrations. The root page in `App/ModSettings.x` holds the Appearance card and links the page of each part of Spotify, and only the stored look's.
+
+## Lossless
+
+Off unless `spotifyglass.lossless` is set; there is no settings row yet. A FLAC or ALAC file in Spotify's
+Documents/Lossless folder (Files app › Spotify › Lossless) plays in place of Spotify's sound for the same recording.
+
+- **Which file:** the folder's index (`.index.plist`, track URI to file name), else a file whose title tag (or
+  name) is the track's title and whose length is within 2 s. Artists are not compared. A file goes in the index
+  once its sound matched (`SGLosslessStore.m`).
+- **Where in the file:** at each track start, seek and resume, 4 s of Spotify's output are matched against the
+  file near Spotify's position: first on a mono copy at 1/16 of the rate, then exactly on a full-rate window. A
+  normalized correlation under 0.8 is another recording or master, and Spotify's sound stays. The file plays
+  from that frame at the gain that matches Spotify's loudness (`SGLosslessEngine.m`).
+- **Playback:** a static 2^19-frame ring that a worker thread fills ahead of where Spotify plays. A block the
+  ring does not hold yet keeps Spotify's sound. The swap is in Shared/Player's source selector, before Sing.
+- **Data:** Spotify still downloads and decodes its own copy, and it downloads a song as it starts. So while
+  the next song in its queue has a file, Spotify's quality is set to low, and the user's value comes back
+  afterwards, also at the next launch (`LosslessQuality.x`).
+- **Not yet:** Karaoke and speeds other than 1 keep Spotify's sound; the first 4 s after each start, seek or
+  resume are Spotify's; a silent block drops the anchor until the next try. Sources that download files are a
+  design only: [Lossless sources](lossless-sources.md), [addons](lossless-addons.md),
+  [playback investigation](lossless-playback.md), [prototype history](lossless-prototype.md).
 
 ## Spicy Lyrics
 
