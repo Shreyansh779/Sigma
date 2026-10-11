@@ -133,7 +133,7 @@ static UIViewController *modSettingsPage(void) {
 
 - (void)layoutSubviews {
     [super layoutSubviews];
-    _title.font = SGSpotifyListFont();
+    _title.font = SGTitleFont();
     CGFloat width = self.bounds.size.width, height = self.bounds.size.height, lead = self.drawer ? 4 : 0;
     _icon.frame = CGRectMake(12 + lead, (height - 24) / 2, 24, 24);
     _title.frame = CGRectMake(48 + lead, 0, width - 96, height);
@@ -188,7 +188,6 @@ void SGOpenModSettings(UIView *source) {
 // At the end of the settings list, or above the first row of the drawer's, with the inset for it
 // added again whenever Spotify resets the inset.
 static void placeRow(UICollectionView *list, SGModSettingsRow *row) {
-    SGAdoptFonts(list, row);
     CGFloat bottom = list.contentSize.height;
     row.hidden = !row.drawer && bottom <= 0;
     row.frame = CGRectMake(0, row.drawer ? -kRowHeight : bottom, list.bounds.size.width, kRowHeight);
