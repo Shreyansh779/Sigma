@@ -72,6 +72,7 @@ static CGFloat moveTo(UIView *arranged, UIView *view, CGPoint point, UIView *hos
 #pragma mark - lyrics
 
 void SGRPlayerLyricsChanged(void) {
+    SGRPlayerVisualiserUpdate();
     SGRGlyphButton *glyph = sg_lyricsGlyph;
     if (!glyph) return;
     BOOL enabled = SGRPlayerLyricsAvailable() || SGRPlayerLyricsOpen(), open = SGRPlayerLyricsOpen();
@@ -207,6 +208,7 @@ static void lowerRow(UIView *row) {
     } else if (!volume) {
         SGRPlayerPlaceVolume(stack, nil, row, kVolumeMargin);
     }
+    SGRPlayerPaintCover(stack);
 
     SGRFooterReach *reach = objc_getAssociatedObject(row, &kReachKey);
     if (!reach) {
