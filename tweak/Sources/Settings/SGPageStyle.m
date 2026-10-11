@@ -1,8 +1,6 @@
 #import "SGPageStyle.h"
 #import "Core/SGCore.h"
 
-static UIFont *sg_spotifyFont;
-
 // The dark appearance's secondary label, fixed rather than dynamic so a view that is not set dark reads it too.
 UIColor *SGGrey(void) { return [UIColor colorWithRed:0xEB / 255.0 green:0xEB / 255.0 blue:0xF5 / 255.0 alpha:0.6]; }
 
@@ -61,8 +59,6 @@ CGFloat SGLayOutSliderText(UILabel *title, UILabel *value, UILabel *subtitle, CG
     }
     return y;
 }
-
-UIFont *SGSpotifyListFont(void) { return sg_spotifyFont ?: [UIFont systemFontOfSize:13 weight:UIFontWeightBold]; }
 
 UIImageView *SGSymbolView(NSString *name, CGFloat size, UIImageSymbolWeight weight, CGFloat box) {
     UIImage *image = [UIImage systemImageNamed:name withConfiguration:[UIImageSymbolConfiguration configurationWithPointSize:size weight:weight]];
@@ -267,16 +263,6 @@ CGFloat SGSectionFooterHeight(UITableView *table, NSString *text) {
 UITableViewCell *SGDequeueCell(UITableView *table, NSString *identifier) {
     return [table dequeueReusableCellWithIdentifier:identifier]
         ?: [[UITableViewCell alloc] initWithStyle:UITableViewCellStyleDefault reuseIdentifier:identifier];
-}
-
-// Spotify's list titles carry its typeface at 13pt.
-void SGAdoptFonts(UIView *list, UIView *row) {
-    if (sg_spotifyFont) return;
-    SGForEachView(list, ^(UIView *v) {
-        if (sg_spotifyFont || ![v isKindOfClass:UILabel.class] || SGIsInside(v, row)) return;
-        UILabel *label = (UILabel *)v;
-        if (label.text.length >= 2 && label.font.pointSize == 13) sg_spotifyFont = label.font;
-    });
 }
 
 UIViewController *SGTopController(void) {
