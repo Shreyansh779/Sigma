@@ -16,6 +16,8 @@ SGModSection *SGLyricsSourcesSection(BOOL namingSource);
 SGModRow *SGLockScreenLyricsRow(void);
 SGModRow *SGLyricsTranslationLanguageRow(void);
 SGModRow *SGLyricsWordTimingRow(void);
+// The Delay slider of the Lyrics page's Timing section.
+SGModRow *SGLyricsDelayRow(void);
 
 // Sweeps a line timed only by the line word by word, on the estimate of when each word is sung, as if
 // the source had timed them. Off, such a line lights up whole as it starts. Off by default: the
@@ -108,6 +110,11 @@ void SGKaraokeAskSpotifyForTiming(NSString *trackID);
 NSString *SGKaraokeSpotifyAuthorization(void);
 NSString *SGKaraokePlayingTrack(void);   // the base62 id, nil before the player reported
 NSInteger SGKaraokePositionMs(void);     // negative when unknown
+// How much later than the song every line shows, 0 to 1000 ms, for Bluetooth headphones that play a little
+// behind the player's clock. Read at every use, so a change applies at once. Whatever times lines against
+// SGKaraokePositionMs takes it off first, and a tap on a line seeks to its start plus it.
+#define SGKeyLyricsDelay @"spotifyglass.lyricsDelay"
+NSInteger SGKaraokeDelayMs(void);
 void SGKaraokeSeek(NSInteger ms);
 id SGKaraokePlayer(void);                // SPTEsperantoPlayer, nil before the app asked it for its state
 // A track the player has reported, by its base62 id; nil for one it has not played this session.

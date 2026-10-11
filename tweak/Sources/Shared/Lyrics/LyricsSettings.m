@@ -30,6 +30,13 @@ SGModRow *SGLyricsTranslationLanguageRow(void) {
     return row;
 }
 
+// Read wherever lines are timed, so it applies as the thumb moves.
+SGModRow *SGLyricsDelayRow(void) {
+    return SGSliderRow(@"Delay", nil, 0, 1000, 25, ^double { return SGKaraokeDelayMs(); },
+                       ^(double value) { SGSetInt(SGKeyLyricsDelay, lround(value)); },
+                       ^NSString *(double value) { return [NSString stringWithFormat:@"%ld ms", lround(value)]; });
+}
+
 // Only the redesign's lyrics view sweeps words.
 SGModRow *SGLyricsWordTimingRow(void) {
     return SGOptionRow(@"Simulate word timing", nil, SGKeyLyricsSimulateWords);

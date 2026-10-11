@@ -64,6 +64,7 @@ static UIViewController *modSettingsPage(void) {
             pageRow(@"Privacy & clutter", @"hand.raised", ^UIViewController *{ return SGPrivacySettingsPage(); }),
         ]),
         SGSection(nil, @[
+            pageRow(@"Labs", @"testtube.2", ^UIViewController *{ return SGLabsPage(); }),
             pageRow(@"All flags", @"flag", ^UIViewController *{ return SGAllFlagsPage(); }),
             mod,
         ]),
