@@ -9,9 +9,10 @@
 <p align="center">
   <img src="https://img.shields.io/badge/iOS-000000?style=for-the-badge&logo=ios&logoColor=white" alt="iOS">
   <img src="https://img.shields.io/badge/Spotify-9.1.78-1ED760?style=for-the-badge&logo=spotify&logoColor=white" alt="Spotify 9.1.78">
+  <img src="https://img.shields.io/badge/9.1.88-supported-555555?style=for-the-badge&logo=spotify&logoColor=white" alt="Spotify 9.1.88 supported">
   <img src="https://img.shields.io/badge/Objective--C-3A95E3?style=for-the-badge&logo=apple&logoColor=white" alt="Objective-C">
   <img src="https://img.shields.io/badge/GitHub_Actions-2671E5?style=for-the-badge&logo=githubactions&logoColor=white" alt="GitHub Actions">
-  <img src="https://img.shields.io/badge/License-PolyForm_Strict_1.0.0-blue?style=for-the-badge" alt="PolyForm Strict 1.0.0">
+  <img src="https://img.shields.io/badge/License-GPL_v3-blue?style=for-the-badge" alt="GPL-3.0">
 </p>
 
 <p align="center">
@@ -30,8 +31,9 @@
 A no-jailbreak Theos tweak that rebuilds Spotify for iOS in Liquid Glass, injected into your own
 decrypted IPA and signed with your own certificate.
 
-Built and tested on **Spotify 9.1.78** — use that version's IPA. The mod hooks Spotify's own classes,
-which change between releases, so another version may build and then break.
+Built and tested on **Spotify 9.1.78**, and checked on **9.1.88**. **9.1.90** likely works: it has not been
+checked beyond a short run. The mod hooks Spotify's own classes, which change between releases, so any other
+version may build and then break.
 
 | | |
 |---|---|
@@ -44,7 +46,7 @@ all. Both looks live in Settings → Mod Settings.
 
 ## Build it
 
-No IPA is distributed. Bring a decrypted **Spotify 9.1.78** IPA; you get an unsigned
+No IPA is distributed. Bring a decrypted **Spotify 9.1.78** IPA (or 9.1.88, or 9.1.90 at your own risk); you get an unsigned
 `Sigma-<mod version>.ipa` to sign with SideStore, Feather or any certificate signer. Each
 release also carries the tweak's `.deb`.
 
@@ -93,11 +95,11 @@ contribution; it is ticked once, before the first pull request is merged.
 [FLEX](https://github.com/FLEXTool/FLEX), as hopeless's AutoFLEX build in `vendor/`, is the inspector
 the view trees are read through.
 
+Parts of Sigma come from [Vitrine](https://github.com/My-Name-Is-Jeff/vitrine) by My-Name-Is-Jeff
+(GPL-3.0): Sing's voice model and engine, local files, the lyrics' delay, the system Music Haptics,
+the volume slider, the landscape player, Home's Top picks, custom fonts, clean links and the What's new
+page.
+
 ## License
 
-Source available under the [PolyForm Strict License 1.0.0](LICENSE): you can read the code and use
-the mod yourself, but not change it, reuse it in other projects or redistribute it. Releases up to
-v0.21.1 were published under GPL-3.0 and stay under it. Files in `vendor/` and `.agents/` keep their
-own licences.
-
-Not affiliated with Spotify.
+GPL-3.0, see [LICENSE](LICENSE). Not affiliated with Spotify.
