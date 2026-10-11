@@ -210,7 +210,25 @@ static NSArray<NSString *> *defaultOrder(void) {
     return @[SGImportedLRCKey, SGSpicyLyricsKey, @"binilyrics", @"musixmatch", @"unison", @"netease", @"lrclib", @"qqmusic", @"kugou"];
 }
 
+// QQ Music and KuGou came after the order was stored on installs from before them: they go on at its end, once,
+// asked only when the rest have missed, and the Lyrics page moves or switches them off from there.
+static void offerChineseCatalogs(void) {
+    static dispatch_once_t once;
+    dispatch_once(&once, ^{
+        NSUserDefaults *store = NSUserDefaults.standardUserDefaults;
+        static NSString *const kOffered = @"spotifyglass.lyrics.chineseCatalogsOffered";
+        NSArray *stored = [store arrayForKey:SGKeyLyricsProviders];
+        if ([store boolForKey:kOffered]) return;
+        [store setBool:YES forKey:kOffered];
+        if (!stored.count) return;   // nothing stored: the default order has them; none on: lyrics are off by choice
+        NSMutableArray *order = [stored mutableCopy];
+        for (NSString *key in @[@"qqmusic", @"kugou"]) if (![order containsObject:key]) [order addObject:key];
+        [store setObject:order forKey:SGKeyLyricsProviders];
+    });
+}
+
 NSArray<NSString *> *SGLyricsOrder(void) {
+    offerChineseCatalogs();
     id stored = [NSUserDefaults.standardUserDefaults arrayForKey:SGKeyLyricsProviders];
     NSArray *legacy = fromLegacyKeys();
     NSArray *keys = [stored isKindOfClass:NSArray.class] ? stored : legacy.count ? legacy : defaultOrder();
