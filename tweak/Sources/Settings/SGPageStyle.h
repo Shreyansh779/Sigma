@@ -35,7 +35,11 @@ UITableViewCell *SGDequeueCell(UITableView *table, NSString *identifier);
 
 void SGOpenURL(NSString *url);
 extern NSString *const SGDiscordURL;
-// The one Spotify build the mod is made for (AGENTS.md lists what else follows it on a bump).
+// The Spotify build the mod is made for (AGENTS.md lists what else follows it on a bump).
 extern NSString *const SGSupportedSpotifyVersion;
+// What else it is run and checked on, and what ran cleanly in a short test only. A version in neither list
+// gets the "isn't supported" alert (App/About/Compatibility.m).
+extern NSArray<NSString *> *SGSupportedSpotifyVersions(void);
+extern NSArray<NSString *> *SGLikelyWorksSpotifyVersions(void);
 // The controller on top of the key window, through whatever is presented over it.
 UIViewController *SGTopController(void);

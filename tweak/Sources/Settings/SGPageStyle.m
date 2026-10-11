@@ -249,6 +249,14 @@ UIViewController *SGTopController(void) {
 NSString *const SGDiscordURL = @"https://discord.gg/9e4GR8TKMj";
 NSString *const SGSupportedSpotifyVersion = @"9.1.78";
 
+NSArray<NSString *> *SGSupportedSpotifyVersions(void) {
+    return @[SGSupportedSpotifyVersion, @"9.1.88"];
+}
+
+NSArray<NSString *> *SGLikelyWorksSpotifyVersions(void) {
+    return @[@"9.1.90"];
+}
+
 void SGOpenURL(NSString *url) {
     NSURL *target = url ? [NSURL URLWithString:url] : nil;
     if (!target) return;
