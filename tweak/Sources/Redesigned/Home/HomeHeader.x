@@ -105,12 +105,16 @@ static void layoutHeader(UIViewController *page) {
     UIStackView *stack = sg_stack;
     vanish(sg_scrim);
 
-    static Class faceClass;
-    if (!faceClass) faceClass = NSClassFromString(@"_TtC29ListeningActivity_ElementsKit21AdaptiveFaceContainer");
     UIView *face = nil;
     for (UIView *part in stack.arrangedSubviews) {
-        if (faceClass && [part isKindOfClass:faceClass]) face = part;
+        if (SGRIsAvatar(part) && !face) face = part;
         else vanish(part);
+    }
+    // Brought back if an earlier pass, or an earlier build, took it for a pill.
+    if (face.alpha == 0) {
+        face.alpha = 1;
+        face.userInteractionEnabled = YES;
+        face.accessibilityElementsHidden = NO;
     }
     if (stack.semanticContentAttribute != UISemanticContentAttributeForceRightToLeft) {
         stack.semanticContentAttribute = UISemanticContentAttributeForceRightToLeft;

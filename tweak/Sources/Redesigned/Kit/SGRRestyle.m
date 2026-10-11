@@ -403,3 +403,10 @@ BOOL SGRFire(UIControl *control) {
     [control sendActionsForControlEvents:fire];
     return YES;
 }
+
+BOOL SGRIsAvatar(UIView *view) {
+    static Class faceClass;
+    if (!faceClass) faceClass = NSClassFromString(@"_TtC29ListeningActivity_ElementsKit21AdaptiveFaceContainer");
+    return [view.accessibilityIdentifier isEqualToString:@"Components.UI.SideDrawerButton"]
+        || (faceClass && [view isKindOfClass:faceClass]);
+}

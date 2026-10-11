@@ -41,7 +41,7 @@ UIColor *SGRAccentColor(void) {
 
 NSInteger SGRAccentRGB(void) {
     NSInteger rgb = chosen();
-    return rgb < 0 ? SGSpotifyGreen : rgb;
+    return rgb < 0 ? 0x1ED760 : rgb;
 }
 
 NSString *SGRAccentLabel(void) {
