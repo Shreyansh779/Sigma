@@ -11,10 +11,27 @@ id SGLinkDispatcher(void) {
     return sg_linkDispatcher;
 }
 
+// 9.1.88 dropped -navigateToURI:options:interactionID:. In 9.1.78 it only wraps
+// -navigateToURI:options:reason:completionHandler:resultHandler:, which every version has, with a
+// [[SPTUBINavigationReason alloc] initWithSourceApplication:nil interactionID:] and no handlers, so later
+// versions get the same. A nil reason crashes 9.1.90: Swift reads it as an enum, not an optional.
 BOOL SGOpenSpotifyURI(NSURL *uri) {
     SPTLinkDispatcherImplementation *dispatcher = sg_linkDispatcher;
-    if (!uri || ![dispatcher respondsToSelector:@selector(navigateToURI:options:interactionID:)]) return NO;
-    [dispatcher navigateToURI:uri options:0 interactionID:nil];
+    if (!uri || !dispatcher) return NO;
+    if ([dispatcher respondsToSelector:@selector(navigateToURI:options:interactionID:)]) {
+        [dispatcher navigateToURI:uri options:0 interactionID:nil];
+        return YES;
+    }
+    SEL full = NSSelectorFromString(@"navigateToURI:options:reason:completionHandler:resultHandler:");
+    SEL init = NSSelectorFromString(@"initWithSourceApplication:interactionID:");
+    Class reasonClass = NSClassFromString(@"SPTUBINavigationReason");
+    if (![dispatcher respondsToSelector:full] || ![reasonClass instancesRespondToSelector:init]) return NO;
+    // alloc and init through void *, outside ARC's reach: init consumes what alloc made and may return
+    // another object, so a cast objc_msgSend over-releases (AGENTS.md).
+    void *raw = ((void *(*)(Class, SEL))objc_msgSend)(reasonClass, @selector(alloc));
+    id reason = CFBridgingRelease(((void *(*)(void *, SEL, id, id))objc_msgSend)(raw, init, nil, nil));
+    if (!reason) return NO;
+    ((void (*)(id, SEL, NSURL *, long long, id, id, id))objc_msgSend)(dispatcher, full, uri, 0, reason, nil, nil);
     return YES;
 }
 
