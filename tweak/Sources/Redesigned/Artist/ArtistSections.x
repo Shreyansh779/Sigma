@@ -21,6 +21,25 @@
 
 static char kSettledKey, kKindsKey, kDroppedKey, kTrackKey;
 
+// The "You liked" row's heart sits on a 24pt black disc at the avatar's corner, a ring on any field but black
+// (device 2026-10-08). The disc goes; a soft shadow keeps the heart readable on the photo.
+static void clearLikedBadge(UIView *cell) {
+    SGForEachView(cell, ^(UIView *row) {
+        if (![row.accessibilityIdentifier isEqualToString:@"Components.UI.LikedSongs.Row"]) return;
+        SGForEachView(row, ^(UIView *disc) {
+            CGSize size = disc.bounds.size;
+            if (size.width > 30 || size.width != size.height || !SGIsBaseSurface(disc.layer.backgroundColor)) return;
+            disc.backgroundColor = UIColor.clearColor;
+            disc.clipsToBounds = NO;
+            disc.layer.shadowColor = UIColor.blackColor.CGColor;
+            disc.layer.shadowOpacity = 0.5;
+            disc.layer.shadowRadius = 2;
+            disc.layer.shadowOffset = CGSizeZero;
+        });
+    });
+}
+static BOOL hideVideos;
+
 typedef NS_ENUM(NSInteger, SGRArtistCell) {
     SGRArtistCellOther,
     SGRArtistCellSpacer,
@@ -142,6 +161,8 @@ static void logOnce(NSString *what) {
     NSIndexPath *path = attributes.indexPath;
     UIView *content = cell.contentView.subviews.firstObject ?: cell.contentView;
     SGRArtistCell kind = kindOf(content, result.size.height);
+    // With the videos' switch off (SGRKeyArtistHideVideos) a video shelf is any other cell and stays.
+    if (kind == SGRArtistCellVideos && !hideVideos) kind = SGRArtistCellOther;
     kindsOf(list)[path] = @(kind);
 
     BOOL drop = kind == SGRArtistCellVideos || [droppedOf(list) containsObject:path];
@@ -188,6 +209,7 @@ static void logOnce(NSString *what) {
 
 %ctor {
     if (!SGRedesignedUI()) return;
+    hideVideos = SGEnabled(SGRKeyArtistHideVideos);
     %init;
     SGRequireClasses(@[@"_TtC12Element_List18CollectionViewCell"]);
 }
