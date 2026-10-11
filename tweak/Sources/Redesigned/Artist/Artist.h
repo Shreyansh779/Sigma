@@ -31,3 +31,8 @@ void SGRArtistSetArtwork(UIView *view, UIImage *image);
 // the answer; NO until then. The first call subscribes for the page's lifetime, and `changed` runs on the
 // main thread whenever the answer changes.
 BOOL SGRArtistFollowing(UIView *page, NSString *moreIdentifier, BOOL *following, void (^changed)(void));
+
+// What the redesign takes off the page, on until switched off (Redesigned/Album/AlbumSettings.m): the videos
+// in the Music list (ArtistSections.x) and the Music / Video / Merch strip (ArtistField.x).
+#define SGRKeyArtistHideVideos @"spotifyglass.redesign.artist.hide.videos"
+#define SGRKeyArtistHideTabs @"spotifyglass.redesign.artist.hide.tabs"

@@ -16,6 +16,7 @@
 #import "Redesigned/Kit/SGRKit.h"
 #import "Artist.h"
 
+static BOOL hideTabs;
 static NSString *const kPageIdentifier = @"creator-page";
 
 // Above for the bounce at the top of the page, below for the one at the end of it.
@@ -122,7 +123,7 @@ static void hideStrip(UIView *strip) {
     %orig;
     for (UIView *v = ((UIView *)self).superview; v; v = v.superview) {
         if (![v.accessibilityIdentifier isEqualToString:@"Components.UI.TabsSectionHeading"]) continue;
-        if (SGRArtistPageOf(v)) hideStrip(v);
+        if (hideTabs && SGRArtistPageOf(v)) hideStrip(v);
         return;
     }
 }
@@ -135,6 +136,7 @@ static void hideStrip(UIView *strip) {
     // updateConstraints], OverflowStackViewLayoutBuilder.Line.tallestView nil). The row stays Spotify's, and
     // ArtistHeader.x draws more itself.
     if (!SGRedesignedUI()) return;
+    hideTabs = SGEnabled(SGRKeyArtistHideTabs);
     %init;
     SGRequireClasses(@[
         @"_TtC32CreativeWorkPlatform_TemplateKit12TemplateView",
