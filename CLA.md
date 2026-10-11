@@ -2,7 +2,7 @@
 
 Version 1.0
 
-This agreement is between you (the **Contributor**) and Vojtěch Škopek (the **Owner**), who runs
+This agreement is between you (the **Contributor**) and Shreyansh Singhal (the **Owner**), who runs
 Sigma (the **Project**). It covers every Contribution you
 have submitted or will submit to the Project.
 

@@ -24,14 +24,17 @@
 #import "Shared/AudioEffects/AudioEffectsPage.h"
 #import "Shared/Privacy/Privacy.h"
 #import "Shared/Flags/Flags.h"
+#import "Shared/Haptics/Haptics.h"
+#import "Shared/Player/PlayerSettings.h"
 #import "App/About/About.h"
 #import "Pages.h"
 
 static const CGFloat kRowHeight = 56;
 static char kRowKey, kInsetKey;
 
-static SGModRow *pageRow(NSString *title, NSString *symbol, UIViewController *(^page)(void)) {
-    return SGWithSymbol(SGPageRow(title, page), symbol);
+// Each part of Spotify on a tile of its own color, as Settings lists its own, so a row is found by its color.
+static SGModRow *pageRow(NSString *title, NSString *symbol, UIColor *color, UIViewController *(^page)(void)) {
+    return SGWithTile(SGPageRow(title, page), symbol, color);
 }
 
 static UIViewController *modSettingsPage(void) {
@@ -42,46 +45,64 @@ static UIViewController *modSettingsPage(void) {
     SGModRow *signing = SGSigningWarningRow();
     if (signing) [warnings addObject:signing];
     if (warnings.count) [sections addObject:SGSection(nil, warnings)];
-    SGModRow *mod = pageRow(@"Mod", @"info.circle", ^UIViewController *{ return SGAboutPage(); });
-    mod.value = ^NSString *{ return @"Trima"; };
-    // Home & Library holds only the native look's switches, and Albums only the redesign's.
-    NSMutableArray<SGModRow *> *parts = [NSMutableArray arrayWithArray:@[
-        pageRow(@"Navbar", @"dock.rectangle", ^UIViewController *{ return SGNavbarPage(); }),
-        pageRow(@"Player", @"play.circle", ^UIViewController *{ return SGPlayerSettingsPage(); }),
-        pageRow(@"Lyrics", @"quote.bubble", ^UIViewController *{ return SGLyricsSettingsPage(); }),
-    ]];
-    if (SGRedesignedUIStored()) [parts addObject:pageRow(@"Albums", @"square.stack", ^UIViewController *{ return SGRAlbumSettingsPage(); })];
-    else [parts addObject:pageRow(@"Home & Library", @"house", ^UIViewController *{ return SGHomeSettingsPage(); })];
-    [sections addObject:SGAppearanceSection()];
-    // Sing and the audio effects work on the sound, so both looks have them; the row follows a download.
-    SGModRow *karaoke = pageRow(@"Karaoke", @"music.mic", ^UIViewController *{ return SGSingSettingsPage(); });
-    karaoke.value = ^NSString *{ return SGSingSummary(); };
-    karaoke.refreshOn = SGSingChangedNotification;
-    // Spatial voice is Sing's too, and shows where the iPhone reads headphone motion, as on Sing's page.
-    SGModRow *spatial = pageRow(@"Spatial voice", @"person.wave.2", ^UIViewController *{ return SGSpatialVoiceSettingsPage(); });
-    spatial.visible = ^BOOL { return SGSingSpatialAvailable(); };
-    SGModRow *audioEffects = pageRow(@"Audio effects", @"slider.vertical.3", ^UIViewController *{ return SGDSPSettingsPage(); });
+
+    // The rows of one look are asked again as Redesigned UI is flipped, so the page shows what the restart brings.
+    BOOL (^redesigned)(void) = ^BOOL { return SGRedesignedUIStored(); };
+    BOOL (^native)(void) = ^BOOL { return !SGRedesignedUIStored(); };
+
+    // What the app looks like.
+    [sections addObject:SGSection(nil, @[
+        SGRedesignedUIRow(),
+        pageRow(@"Appearance", @"paintpalette", UIColor.systemBlueColor, ^UIViewController *{ return SGAppearancePage(); }),
+        pageRow(@"Tab bar", @"dock.rectangle", UIColor.systemIndigoColor, ^UIViewController *{ return SGNavbarPage(); }),
+    ])];
+
+    // Home & Library holds only the native look's switches; the redesign has its album and artist pages instead.
+    SGModRow *albums = pageRow(@"Albums & artists", @"square.stack", UIColor.systemCyanColor, ^UIViewController *{ return SGRAlbumSettingsPage(); });
+    albums.visible = redesigned;
+    SGModRow *home = pageRow(@"Home & Library", @"house", UIColor.systemCyanColor, ^UIViewController *{ return SGHomeSettingsPage(); });
+    home.visible = native;
+    [sections addObject:SGSection(nil, @[
+        pageRow(@"Player", @"play.circle", UIColor.systemPinkColor, ^UIViewController *{ return SGPlayerSettingsPage(); }),
+        pageRow(@"Lyrics", @"quote.bubble", UIColor.systemPurpleColor, ^UIViewController *{ return SGLyricsSettingsPage(); }),
+        albums,
+        home,
+    ])];
+
+    // Sing and the audio effects work on the sound, so both looks have them; Audio effects says how many are on.
+    SGModRow *sing = pageRow(@"Karaoke", @"music.mic", UIColor.systemRedColor, ^UIViewController *{ return SGSingSettingsPage(); });
+    SGModRow *audioEffects = pageRow(@"Audio effects", @"slider.vertical.3", UIColor.systemOrangeColor, ^UIViewController *{ return SGDSPSettingsPage(); });
     audioEffects.value = ^NSString *{ return SGDSPSummary(); };
-    // AirPods gestures read the head motion Spatial voice reads, and act under either look.
-    SGModRow *airpods = pageRow(@"AirPods gestures", @"airpods.pro", ^UIViewController *{ return SGHeadGesturesSettingsPage(); });
-    NSMutableArray<SGModRow *> *features = [NSMutableArray arrayWithObjects:karaoke, spatial, audioEffects, airpods, nil];
+    // Spatial voice is Sing's too, and shows where the iPhone reads headphone motion, as on Sing's page.
+    SGModRow *spatial = pageRow(@"Spatial voice", @"person.wave.2", UIColor.systemIndigoColor, ^UIViewController *{ return SGSpatialVoiceSettingsPage(); });
+    spatial.visible = ^BOOL { return SGSingSpatialAvailable(); };
+    // Vibrations hook Spotify's own controls and its audio, so they answer under either look.
+    SGModRow *vibrations = pageRow(@"Vibrations", @"iphone.radiowaves.left.and.right", UIColor.systemPinkColor, ^UIViewController *{ return SGVibrationsSettingsPage(); });
+    NSMutableArray<SGModRow *> *features = [NSMutableArray arrayWithObjects:sing, spatial, audioEffects, vibrations, nil];
     // The Live Activity works under both looks, where ActivityKit's card does.
     if (@available(iOS 17.0, *)) {
-        [features addObject:pageRow(@"Live Activity", @"platter.filled.top.iphone", ^UIViewController *{ return SGLiveActivitySettingsPage(); })];
+        SGModRow *liveActivity = pageRow(@"Live Activity", @"platter.filled.top.iphone", UIColor.systemTealColor, ^UIViewController *{ return SGLiveActivitySettingsPage(); });
+        [features addObject:liveActivity];
     }
+    [features addObject:pageRow(@"AirPods gestures", @"airpods.pro", UIColor.systemGrayColor, ^UIViewController *{ return SGHeadGesturesSettingsPage(); })];
     [sections addObject:SGSection(nil, features)];
+
+    SGModRow *mod = pageRow(@"Mod", @"info.circle", UIColor.systemGrayColor, ^UIViewController *{ return SGAboutPage(); });
+    mod.value = ^NSString *{ return @(SG_VERSION); };
     [sections addObjectsFromArray:@[
-        SGSection(nil, parts),
         SGSection(nil, @[
-            pageRow(@"Privacy & clutter", @"hand.raised", ^UIViewController *{ return SGPrivacySettingsPage(); }),
+            pageRow(@"Lock screen", @"lock", UIColor.systemGrayColor, ^UIViewController *{ return SGLockScreenWidgetPage(); }),
+            pageRow(@"Privacy & clutter", @"hand.raised", UIColor.systemBlueColor, ^UIViewController *{ return SGPrivacySettingsPage(); }),
         ]),
         SGSection(nil, @[
-            pageRow(@"Labs", @"testtube.2", ^UIViewController *{ return SGLabsPage(); }),
-            pageRow(@"All flags", @"flag", ^UIViewController *{ return SGAllFlagsPage(); }),
-            mod,
+            pageRow(@"Labs", @"testtube.2", UIColor.systemMintColor, ^UIViewController *{ return SGLabsPage(); }),
+            pageRow(@"All flags", @"flag", UIColor.systemGrayColor, ^UIViewController *{ return SGAllFlagsPage(); }),
         ]),
+        SGSection(nil, @[mod]),
     ]];
-    return [[SGModPage alloc] initWithTitle:@"Sigma" intro:nil sections:sections footer:nil];
+    SGModPage *page = [[SGModPage alloc] initWithTitle:@"Sigma" intro:nil sections:sections footer:nil];
+    page.tiles = YES;
+    return page;
 }
 
 #pragma mark - row in the settings list and the side drawer
@@ -112,7 +133,7 @@ static UIViewController *modSettingsPage(void) {
 
 - (void)layoutSubviews {
     [super layoutSubviews];
-    _title.font = SGTitleFont();
+    _title.font = SGSpotifyListFont();
     CGFloat width = self.bounds.size.width, height = self.bounds.size.height, lead = self.drawer ? 4 : 0;
     _icon.frame = CGRectMake(12 + lead, (height - 24) / 2, 24, 24);
     _title.frame = CGRectMake(48 + lead, 0, width - 96, height);
@@ -229,17 +250,22 @@ static BOOL isSettingsRoot(UIViewController *list) {
 %end
 
 // The drawer's list (trees/test6.txt: SideDrawerListCollectionView under the profile header, Your
-// plan its first cell) is one of several collection views on the page, so it is found by name.
-static SGModSettingsRow *ensureDrawerRow(UICollectionView *list) {
+// plan its first cell) is one of several collection views on the page, so it is found by name, and
+// its class is kept for the list's own layout below to know it by. Spotify 9.1.78's private class is
+// looked up at launch, so the list gets its row on its first layout, even before its controller's.
+static NSString *const kDrawerList = @"_TtC23SideDrawer_ListPageImplP33_1D8CA7A9CC41E8D184AF8B9AAE4E684E28SideDrawerListCollectionView";
+static Class sg_drawerList;
+
+// Spotify can take the list's subviews away and fill it again while keeping the list itself, so a
+// row that has lost its place is put back rather than a second one made.
+static void attachDrawerRow(UICollectionView *list) {
     SGModSettingsRow *row = objc_getAssociatedObject(list, &kRowKey);
     if (!row) {
         row = [[SGModSettingsRow alloc] initWithFrame:CGRectZero];
         row.drawer = YES;
         objc_setAssociatedObject(list, &kRowKey, row, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
     }
-    // Spotify can rebuild the collection view's children while keeping the collection view itself.
     if (row.superview != list) [list addSubview:row];
-    return row;
 }
 
 %hook _TtC23SideDrawer_ListPageImpl18ListViewController
@@ -247,29 +273,31 @@ static SGModSettingsRow *ensureDrawerRow(UICollectionView *list) {
     %orig;
     SGForEachView(((UIViewController *)self).view, ^(UIView *v) {
         if (![v isKindOfClass:UICollectionView.class] || ![NSStringFromClass(v.class) containsString:@"SideDrawerListCollectionView"]) return;
-        ensureDrawerRow((UICollectionView *)v);
+        sg_drawerList = v.class;
+        attachDrawerRow((UICollectionView *)v);
     });
 }
 %end
 
-// The lists lay out after their controllers and again whenever their content changes.
+// The lists lay out after their controllers and again whenever their content changes. The drawer's
+// can fill after its controller laid out, so its row is made or put back there too. Either list's row
+// that Spotify took away with the list's subviews is put back before it is placed.
 %hook UICollectionView
 - (void)layoutSubviews {
     %orig;
+    if (sg_drawerList && [self isKindOfClass:sg_drawerList]) attachDrawerRow(self);
     SGModSettingsRow *row = objc_getAssociatedObject(self, &kRowKey);
-    // The drawer sometimes populates its list after its controller's layout callback.
-    if (!row && [NSStringFromClass(self.class) containsString:@"SideDrawerListCollectionView"])
-        row = ensureDrawerRow(self);
-    else if (row && row.superview != self)
-        [self addSubview:row];
-    if (row) placeRow(self, row);
+    if (!row) return;
+    if (row.superview != self) [self addSubview:row];
+    placeRow(self, row);
 }
 %end
 
 %ctor {
+    sg_drawerList = NSClassFromString(kDrawerList);
+    SGCheckCompatibilityOnce();
     %init;
     SGRequireClasses(@[@"_TtC21Settings_PlatformImpl26SettingsListViewController", @"_TtC23SideDrawer_ListPageImpl18ListViewController"]);
     SGRegisterPages();
-    SGCheckCompatibilityOnce();
     SGCheckSigningOnce();
 }

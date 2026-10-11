@@ -44,7 +44,8 @@ static void offerRestart(BOOL on) {
     [SGTopController() presentViewController:alert animated:YES completion:nil];
 }
 
-SGModSection *SGAppearanceSection(void) {
+// Redesigned UI, the one switch between the two looks, glowing at the head of Mod Settings.
+SGModRow *SGRedesignedUIRow(void) {
     SGModRow *redesign = SGOptionRow(@"Redesigned UI", nil, SGKeyRedesign);
     redesign.glows = YES;
     redesign.info = SGRedesignedUIInfo;
@@ -52,12 +53,16 @@ SGModSection *SGAppearanceSection(void) {
         SGSetRedesignedUI(on);
         offerRestart(on);
     };
-    NSMutableArray<SGModRow *> *rows = [NSMutableArray arrayWithObject:SGWithSymbol(redesign, @"sparkles")];
-    [rows addObjectsFromArray:SGRedesignedUIStored() ? SGRAppearanceRows() : SGNativeAppearanceRows()];
-    if (SGRedesignedUIStored()) [rows addObject:SGRHomeTopPicksRow()];
-    // One font for the whole app, under either look.
-    [rows addObjectsFromArray:SGAppFontRows()];
-    return SGNotedSection(@"Appearance", rows, @"Changes apply after you restart Spotify.");
+    return SGWithTile(redesign, @"sparkles", UIColor.systemPurpleColor);
+}
+
+// The stored look's own rows, then the font, which works under either look on any iOS. Redesigned UI itself
+// leads Mod Settings' main page.
+UIViewController *SGAppearancePage(void) {
+    return [[SGModPage alloc] initWithTitle:@"Appearance" intro:SGRestartNote sections:@[
+        SGSection(nil, SGRedesignedUIStored() ? [SGRAppearanceRows() arrayByAddingObject:SGRHomeTopPicksRow()] : SGNativeAppearanceRows()),
+        SGSection(nil, SGAppFontRows()),
+    ] footer:nil];
 }
 
 UIViewController *SGNavbarPage(void) {

@@ -7,6 +7,9 @@
 #define SGKeyAccent @"spotifyglass.accent"   // 0xRRGGBB; unset or negative keeps Spotify's own green
 
 UIColor *SGAccentColor(void);   // nil while Spotify's own green is kept
+// The last colour picked, kept while a preset is in place so Custom brings it back.
+#define SGKeyAccentCustom @"spotifyglass.accent.custom"
+NSInteger SGAccentRGB(void);    // the colour in effect, 0xRRGGBB, Spotify's green included
 NSString *SGAccentLabel(void);  // "#RRGGBB", or the name of Spotify's own
 void SGPickAccent(void);        // the system colour picker over the top of the app, stored on the way out
 
