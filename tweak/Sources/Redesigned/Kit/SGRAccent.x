@@ -15,13 +15,10 @@ static const uint32_t kGreens[] = {0x1ED760, 0x1DB954};
 
 static NSInteger sg_accent = -1;   // 0xRRGGBB once chosen, read at launch
 
-// The redesign's own green until another is picked; Spotify's is a pick of its own, stored as -1.
-static const NSInteger kDefaultAccent = 0x37F200;
-
 static NSInteger chosen(void) {
     NSInteger icon = SGAppIconThemeRGB();
     if (icon >= 0) return icon;
-    NSInteger rgb = SGInt(SGRKeyAccent, kDefaultAccent);
+    NSInteger rgb = SGInt(SGRKeyAccent, SGRDefaultAccent);
     return rgb >= 0 && rgb <= 0xFFFFFF ? rgb : -1;
 }
 

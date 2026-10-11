@@ -198,7 +198,8 @@ void SGRPlayerPaintCover(UIView *stack) {
     [CATransaction begin];
     [CATransaction setDisableActions:YES];
     SGForEachView(stack, ^(UIView *view) {
-        if ([view isKindOfClass:UIImageView.class]) paintImageView((UIImageView *)view);
+        if ([view.accessibilityIdentifier isEqualToString:SGRPlainCheckIdentifier]) view.tintColor = sg_cover < 0 ? SGRAccent() : coverColor();
+        else if ([view isKindOfClass:UIImageView.class]) paintImageView((UIImageView *)view);
         else if (lottie && [view isKindOfClass:lottie]) paintLayers(view.layer);
         else paintBackground(view);
     });

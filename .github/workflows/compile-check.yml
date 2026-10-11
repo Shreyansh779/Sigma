@@ -1,0 +1,75 @@
+name: Compile check
+
+# Builds the tweak alone, keeping going after an error so one run lists every file that fails.
+# No IPA is injected: the flag table needs the IPA once and is cached after that. Runs on every push to the
+# port's branch; delete this file with the branch.
+on:
+  push:
+    branches: [feat/vitrine-port]
+  workflow_dispatch:
+    inputs:
+      ipa_url:
+        description: "Direct link to a decrypted Spotify IPA (empty: the IPA_URL secret)"
+        required: false
+        type: string
+
+env:
+  THEOS: ${{ github.workspace }}/theos
+
+jobs:
+  compile:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest-stable
+
+      - uses: actions/checkout@v5
+        with:
+          repository: theos/theos
+          path: theos
+          submodules: recursive
+
+      - name: Install tools
+        run: brew install make dpkg ldid
+
+      - name: Flag table cache
+        id: flags
+        uses: actions/cache/restore@v4
+        with:
+          path: tweak/Sources/Shared/Flags/SGFlagList.m
+          key: flag-table-${{ hashFiles('scripts/extract-flags.py') }}
+
+      - name: Flag table from the IPA
+        if: steps.flags.outputs.cache-hit != 'true'
+        env:
+          INPUT_URL: ${{ inputs.ipa_url }}
+          SECRET_URL: ${{ secrets.IPA_URL }}
+        run: |
+          mkdir -p ipa
+          URL="${INPUT_URL:-$SECRET_URL}"
+          [ -n "$URL" ] || { echo "::error::No ipa_url given and no IPA_URL secret set"; exit 1; }
+          curl -fsSL "$URL" -o ipa/spotify.ipa
+          ./scripts/extract-flags.py ipa/spotify.ipa
+
+      - name: Keep the flag table
+        if: steps.flags.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: tweak/Sources/Shared/Flags/SGFlagList.m
+          key: flag-table-${{ hashFiles('scripts/extract-flags.py') }}
+
+      - name: Compile
+        run: |
+          env -u MAKELEVEL gmake -k -C tweak package 2>&1 | tee build.log || true
+          echo "---- errors"
+          grep -E "error:|Undefined symbols|ld: symbol" build.log | sed -E 's/\x1b\[[0-9;]*m//g; s#^.*/tweak/##' | sort -u | tee errors.txt
+          [ ! -s errors.txt ]
+
+      - uses: actions/upload-artifact@v5
+        if: always()
+        with:
+          name: build.log
+          path: build.log

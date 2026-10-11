@@ -5,6 +5,18 @@
 #define SGRKeyAccent @"spotifyglass.redesign.accent"   // 0xRRGGBB
 
 NSInteger SGRAccentRGB(void);   // the colour in effect, 0xRRGGBB, Spotify's green included
+// The last colour picked, kept while a preset is in place so Custom brings it back.
+#define SGRKeyAccentCustom @"spotifyglass.redesign.accent.custom"
+// The redesign's own green until another is picked; Spotify's is a pick of its own, stored as -1.
+#define SGRDefaultAccent 0x37F200
+
+// Plain checkmark (SGRPlainCheck.x): a saved song's circled tick as a plain checkmark in the accent. Off until switched
+// on, read at launch.
+#define SGRKeyPlainCheck @"spotifyglass.redesign.plainCheck"
+BOOL SGRPlainCheckOn(void);
+// The plain checkmark's view, a template image: Follow the cover (Player/PlayerCoverAccent.x) sets its tint.
+#define SGRPlainCheckIdentifier @"spotifyglass.plainCheck"
+
 UIColor *SGRAccentColor(void);   // nil while Spotify's own green is kept
 NSString *SGRAccentLabel(void);  // "#RRGGBB", or the name of Spotify's own
 void SGRPickAccent(void);        // the system colour picker over the top of the app, stored on the way out

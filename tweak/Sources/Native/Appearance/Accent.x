@@ -35,6 +35,11 @@ UIColor *SGAccentColor(void) {
     return [UIColor colorWithRed:r green:g blue:b alpha:1];
 }
 
+NSInteger SGAccentRGB(void) {
+    NSInteger rgb = chosen();
+    return rgb < 0 ? SGSpotifyGreen : rgb;
+}
+
 NSString *SGAccentLabel(void) {
     NSInteger rgb = chosen();
     return rgb < 0 ? @"Spotify green" : [NSString stringWithFormat:@"#%06lX", (long)rgb];

@@ -168,7 +168,7 @@ static UIView *iconAccessory(NSString *name) {
 - (UIView *)tableView:(UITableView *)table viewForHeaderInSection:(NSInteger)section {
     return SGSectionHeader(table, section == 0 ? @"Name" : @"Customize");
 }
-- (CGFloat)tableView:(UITableView *)table heightForHeaderInSection:(NSInteger)section { return SGSectionHeaderHeight; }
+- (CGFloat)tableView:(UITableView *)table heightForHeaderInSection:(NSInteger)section { return SGSectionHeaderHeight(); }
 - (CGFloat)tableView:(UITableView *)table heightForFooterInSection:(NSInteger)section { return CGFLOAT_MIN; }
 - (CGFloat)tableView:(UITableView *)table heightForRowAtIndexPath:(NSIndexPath *)path { return path.section == 0 ? 56 : UITableViewAutomaticDimension; }
 
@@ -263,7 +263,7 @@ static UIView *iconAccessory(NSString *name) {
 - (UIView *)tableView:(UITableView *)table viewForHeaderInSection:(NSInteger)section {
     return SGSectionHeader(table, section == 0 ? @"Spotify's pages" : @"Custom link");
 }
-- (CGFloat)tableView:(UITableView *)table heightForHeaderInSection:(NSInteger)section { return SGSectionHeaderHeight; }
+- (CGFloat)tableView:(UITableView *)table heightForHeaderInSection:(NSInteger)section { return SGSectionHeaderHeight(); }
 - (CGFloat)tableView:(UITableView *)table heightForFooterInSection:(NSInteger)section { return CGFLOAT_MIN; }
 
 - (UITableViewCell *)tableView:(UITableView *)table cellForRowAtIndexPath:(NSIndexPath *)path {
@@ -651,7 +651,7 @@ typedef NS_ENUM(NSInteger, SGNavbarSection) {
 }
 
 - (CGFloat)tableView:(UITableView *)table heightForHeaderInSection:(NSInteger)section {
-    if ([self headerFor:section]) return SGSectionHeaderHeight;
+    if ([self headerFor:section]) return SGSectionHeaderHeight();
     return [self tableView:table numberOfRowsInSection:section] ? SGSectionGap : CGFLOAT_MIN;
 }
 

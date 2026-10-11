@@ -31,3 +31,5 @@ void SGMigrateKey(NSString *from, NSString *to);
 
 // Quits Spotify so the hooks read the switches afresh on the next launch; the writes reach cfprefsd first.
 void SGRestartSpotify(void);
+#define SGAppleMusicRed 0xFA2D48
+#define SGSpotifyGreen 0x1ED760
