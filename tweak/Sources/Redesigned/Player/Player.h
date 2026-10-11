@@ -22,8 +22,8 @@
 //     PlayerLyrics.x     the lyrics in the player: the cover as a thumbnail, the title up beside it,
 //                        and after a few seconds untouched the lines alone on the whole player
 //     PlayerMorph.x      the open and close grown out of the now playing bar's card, the cover flown
-//     PlayerMenu.x       the ⋯ opening a menu the way the Music app draws one (SGRPlayerMenu.h), over
-//                        Spotify's own sheet, which it reads its rows from and keeps out of sight
+//     PlayerMenu.m       the ⋯ opening the system menu (Redesigned/ContextMenu): Share, Add to playlist and
+//                        Add to queue on top, the player's own items, then More with the rest of Spotify's rows
 //
 // A Spotify Free account with pick and shuffle gets the player in another mode (NowPlayingReinventFreeMode),
 // whose header, information, duration, controls and footer units are classes of their own holding the
@@ -62,11 +62,14 @@ extern NSNotificationName const SGRPlayerBackgroundDidChangeNotification;
 // that follow the choice, Controls and the Mini player, then `more` (App/Pages.m).
 UIViewController *SGRPlayerSettingsPage(NSArray *more);
 
-#pragma mark - the ⋯ menu (PlayerMenu.x)
+#pragma mark - the ⋯ menu (PlayerMenu.m)
 
-// Marks a sheet opened soon after a tap on `button`, the player's ⋯, as the one the menu takes over, and
-// the button as where the menu grows from (watching it twice does nothing).
-void SGRPlayerMenuWatchMoreButton(UIView *button);
+// The more button's menu opens as the system menu with the player's own items (PlayerMenu.m). Called from
+// PlayerHeader.x on every layout of the button; watching it again only replaces the items.
+void SGRPlayerMenuWatch(UIView *button);
+// Switches the background to `kind` from the menu, at once: Fluid, Animated or Visualizer, while it is one of
+// them (SGPlayerMenuOffersAnimatedArtwork); nothing otherwise.
+void SGRPlayerMenuSetBackground(SGRPlayerBackgroundKind kind);
 
 // The field behind the player, nil until the player has laid out once (PlayerField.x).
 SGRArtworkField *SGRPlayerField(void);
