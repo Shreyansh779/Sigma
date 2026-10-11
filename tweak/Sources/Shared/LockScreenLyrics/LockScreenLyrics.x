@@ -9,8 +9,6 @@
 #import "LockScreenLyrics.h"
 #import "Shared/Lyrics/Lyrics.h"
 #import "Headers/SPTPlayer.h"
-#import "Shared/Sing/SGSingController.h"
-#import "Shared/Player/PlayerState.h"
 
 static const NSTimeInterval kTick = 0.25;
 // Past a line's sung end by this much, with the next line at least this far off, the artist comes back.
@@ -24,7 +22,7 @@ static NSDictionary *sg_spotifyInfo;
 static CFAbsoluteTime sg_spotifyInfoAt;
 static NSString *sg_shownLine;
 static BOOL sg_resending;
-static NSTimer *sg_timer;
+static dispatch_source_t sg_timer;
 
 static NSString *textOf(NSArray<SGKaraokeWord *> *words) {
     SGKaraokeLine *line = [SGKaraokeLine new];
@@ -56,12 +54,11 @@ static NSArray<NSArray<SGKaraokeWord *> *> *piecesOf(SGKaraokeLine *line) {
     return pieces;
 }
 
-// Seconds into the track at `now`, run on from what Spotify last reported.
+// Seconds into the track at `now`, run on from what Spotify last reported. A rate it left out runs at 1, as
+// playingBy counts it: read as 0, every line written pinned the lock screen's time to Spotify's last report.
 static double elapsedAt(NSDictionary *info, CFAbsoluteTime reportedAt, CFAbsoluteTime now) {
-    SPTPlayerState *state = SGPlayerState();
-    double position;
-    if ([state.track.trackTitle isEqualToString:info[MPMediaItemPropertyTitle]] && SGSingPosition(state, &position)) return position;
-    double rate = [info[MPNowPlayingInfoPropertyPlaybackRate] doubleValue];
+    NSNumber *reported = info[MPNowPlayingInfoPropertyPlaybackRate];
+    double rate = reported ? reported.doubleValue : 1;
     return [info[MPNowPlayingInfoPropertyElapsedPlaybackTime] doubleValue] + rate * (now - reportedAt);
 }
 
@@ -90,10 +87,12 @@ static NSString *lineFor(NSDictionary *info, double elapsed) {
     return shown;
 }
 
+// Spotify's info with the line in place of the artist, or its own artist for nil. The clock always moves
+// on to `elapsed`: the system takes the elapsed time as now's, so the one Spotify reported a while ago
+// would pull the progress bar back.
 static NSDictionary *withLine(NSDictionary *info, NSString *line, double elapsed) {
     NSMutableDictionary *shown = [info mutableCopy];
     if (line) shown[MPMediaItemPropertyArtist] = line;
-    // iOS reads a resent elapsed time as the position now, so Spotify's older one would jump the bar back.
     shown[MPNowPlayingInfoPropertyElapsedPlaybackTime] = @(elapsed);
     return shown;
 }
@@ -120,12 +119,24 @@ static void tick(void) {
 static void setTicking(BOOL on) {
     if (on == (sg_timer != nil)) return;
     if (!on) {
-        [sg_timer invalidate];
+        dispatch_source_cancel(sg_timer);
         sg_timer = nil;
         return;
     }
-    sg_timer = [NSTimer timerWithTimeInterval:kTick repeats:YES block:^(NSTimer *t) { tick(); }];
-    [NSRunLoop.mainRunLoop addTimer:sg_timer forMode:NSRunLoopCommonModes];
+    // A strict GCD timer: the main run loop's timers are throttled while the screen is off, and the lines stood
+    // still on a locked phone.
+    sg_timer = dispatch_source_create(DISPATCH_SOURCE_TYPE_TIMER, 0, DISPATCH_TIMER_STRICT, dispatch_get_main_queue());
+    uint64_t every = (uint64_t)(kTick * NSEC_PER_SEC);
+    dispatch_source_set_timer(sg_timer, dispatch_time(DISPATCH_TIME_NOW, every), every, 10 * NSEC_PER_MSEC);
+    dispatch_source_set_event_handler(sg_timer, ^{
+        static CFAbsoluteTime last;
+        static int late;
+        CFAbsoluteTime now = CFAbsoluteTimeGetCurrent();
+        if (last && now - last > 2 && late++ < 5) SGLog(@"%s: ticked %.1f s late", __FILE_NAME__, now - last - kTick);
+        last = now;
+        tick();
+    });
+    dispatch_resume(sg_timer);
 }
 
 // Whether the sound is moving. A rate Spotify did not report at all counts as moving: the line would

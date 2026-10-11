@@ -37,21 +37,18 @@
 // back, and a tap that does so does only that: it does not seek to the line under it. Pausing brings
 // them back as well, and they stay while the song is paused. VoiceOver keeps them.
 //
-// With Sing available (Shared/Sing: switched on in Mod Settings > Karaoke, its voice model downloaded), its
-// microphone (Redesigned/Lyrics/SGRSingControl.h) sits in the bottom trailing corner of the lines' band,
-// opposite their own glass button, and goes down with the band when the controls go. While it is open,
-// preparing or explaining itself the controls do not go, but ones that are away already stay away: a
-// touch on the microphone is for it and brings nothing back, since the band it sits in would move it out
-// from under the finger. The lines open with Sing available even for a song without lyrics, so the
-// microphone can always be reached; switched off, or without its model, there is no microphone and a song
-// without lyrics keeps its cover. Both follow the switch and the model as they change.
+// With Sing available (Shared/Sing: its mic shown in Mod Settings > Karaoke and its voice model downloaded), the lines
+// open even for a song without lyrics, so the mic (Redesigned/Lyrics/SGRSingButton.h), which sits in the bottom
+// trailing corner of the lines' view, can always be reached. It stays while the lines are alone, moving down
+// with them, and a touch on it is its own: it brings nothing back.
+
 #import <UIKit/UIGestureRecognizerSubclass.h>
 #import "Core/SGCore.h"
 #import "Redesigned/Kit/SGRKit.h"
 #import "Redesigned/Lyrics/SGRKaraokeView.h"
-#import "Redesigned/Lyrics/SGRSingControl.h"
+#import "Redesigned/Lyrics/SGRSingButton.h"
 #import "Shared/Lyrics/Lyrics.h"
-#import "Shared/Sing/SGSingController.h"
+#import "Shared/Sing/Sing.h"
 #import "Player.h"
 
 static const CGFloat kThumbSide = 72;          // the cover once the lyrics are up
@@ -84,8 +81,6 @@ static BOOL sg_moving;                      // the transition is in flight, so n
 static BOOL sg_alone;                       // the controls are away and the lines have the player
 static BOOL sg_tapBroughtBack;              // the touch going on began with them away, so its tap seeks nowhere
 static NSTimer *sg_aloneTimer;
-static BOOL sg_singHeld;                    // Sing's microphone is open, preparing or explaining itself
-static __weak UIView *sg_sing;              // the microphone, when Sing is on
 static __weak UIView *sg_host;              // SPTNowPlayingView
 static __weak UIViewController *sg_player;  // its controller
 static __weak UIViewController *sg_header, *sg_info, *sg_duration, *sg_floating;
@@ -217,6 +212,8 @@ static __weak UIView *sg_titleElement;      // the arranged element view holding
 - (SGRKaraokeView *)lyrics {
     if (!_lyrics) {
         _lyrics = [[SGRKaraokeView alloc] initWithFrame:_stage.bounds];
+        // Sing's mic stays while the lines are on their own, moving down with them (setAlone).
+        _lyrics.keepsSing = YES;
         _lyrics.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
         _lyrics.takesTap = ^BOOL { return !sg_tapBroughtBack; };
     }
@@ -377,15 +374,12 @@ static void stopAloneTimer(void) {
 
 static void scheduleAlone(void);
 
-// Sing's microphone in the corner of the band the lines have now. Held, it keeps the controls from going
-// and lets the count start over once it lets go.
-static void placeSing(SGRPlayerLyricsOverlay *overlay, SGRLyricsLayout l) {
-    CGRect band = [overlay convertRect:sg_alone ? l.room : l.stage fromView:sg_host];
-    sg_sing = SGRSingControlForPage(overlay, band, sg_alone, ^(BOOL held) {
-        sg_singHeld = held;
-        if (held) stopAloneTimer();
-        else scheduleAlone();
-    });
+// Sing is available when its mic is shown and the voice model is in, so the lines open even for a song with
+// none, and the mic can always be reached.
+static BOOL singAvailable(void) {
+    if (!SGEnabled(SGKeySingButton)) return NO;
+    SGSingState state = SGSingCurrentState();
+    return state != SGSingStateUnavailable && state != SGSingStateNoModel && state != SGSingStateDownloading;
 }
 
 static void setAlone(BOOL alone, BOOL animated) {
@@ -401,10 +395,7 @@ static void setAlone(BOOL alone, BOOL animated) {
     if (l.ok && overlay.superview) [overlay.lyrics setLineInsets:bandOf(l, alone) duration:duration];
     void (^fade)(void) = ^{
         showControls(alone ? 0 : 1, overlay);
-        if (l.ok && overlay.superview) {
-            placeSing(overlay, l);
-            [sg_sing layoutIfNeeded];
-        }
+        if (overlay.superview) overlay.lyrics.extrasHidden = alone;
     };
     if (duration > 0) {
         [UIView animateWithDuration:duration delay:0
@@ -422,7 +413,7 @@ static void setAlone(BOOL alone, BOOL animated) {
 static BOOL mayGoAlone(void) {
     UIView *host = sg_host;
     SGRPlayerLyricsOverlay *overlay = host ? objc_getAssociatedObject(host, &kOverlayKey) : nil;
-    if (!sg_open || sg_moving || sg_singHeld || !host.window || !overlay.superview || overlay.lyrics.hidden) return NO;
+    if (!sg_open || sg_moving || SGSingCurrentState() == SGSingStatePreparing || !host.window || !overlay.superview || overlay.lyrics.hidden) return NO;
     SPTPlayerState *state = SGPlayerState();
     if (!state || state.isPaused) return NO;
     // A sheet the player opens (the queue, the devices, the menu) is presented by its topmost controller.
@@ -449,9 +440,12 @@ static void scheduleAlone(void) {
 
 // A touch has begun somewhere on the player, on `view`.
 static void touched(UIView *view) {
-    if (sg_alone && sg_sing && [view isDescendantOfView:sg_sing]) {
-        sg_tapBroughtBack = NO;
-        return;
+    // Sing's mic and its slider stay while the lines are alone, and a touch on them is theirs alone.
+    for (UIView *up = view; sg_alone && up; up = up.superview) {
+        if ([up isKindOfClass:SGRSingButton.class]) {
+            sg_tapBroughtBack = NO;
+            return;
+        }
     }
     sg_tapBroughtBack = sg_alone;
     if (sg_alone) setAlone(NO, YES);
@@ -490,7 +484,7 @@ static void watchTouches(UIView *host) {
 
 BOOL SGRPlayerLyricsAvailable(void) {
     NSString *track = SGKaraokePlayingTrack();
-    return track != nil && (SGKaraokeLinesForTrack(track) != nil || SGSingAvailable());
+    return track != nil && (SGKaraokeLinesForTrack(track) != nil || singAvailable());
 }
 
 BOOL SGRPlayerLyricsOpen(void) {
@@ -565,7 +559,6 @@ static void setOpen(BOOL open, BOOL animated) {
     SGRPlayerAnimatedFollowLyrics(open, animated);
 
     SGRPlayerLyricsOverlay *overlay = overlayIn(host);
-    if (!open) SGRSingControlDismiss(overlay);
     place(overlay, host, l);
     CGAffineTransform away = thumbTransform(l);
     BOOL inPlace = SGRPlayerAnimatedShowing(NULL, NULL);
@@ -580,8 +573,6 @@ static void setOpen(BOOL open, BOOL animated) {
         overlay.stage.alpha = 0;
         overlay.stage.transform = CGAffineTransformMakeScale(kLyricsEnterScale, kLyricsEnterScale);
         [overlay.lyrics setLineInsets:bandOf(l, NO) duration:0];
-        placeSing(overlay, l);
-        sg_sing.alpha = 0;
         // Spotify's cover goes the moment the redesign's own takes its place: the same picture at the
         // same size with the same corners, so there is nothing to see in the swap. Coming back it waits
         // for the thumbnail to land on it, or the two would be on screen at once, one of them half size.
@@ -599,7 +590,6 @@ static void setOpen(BOOL open, BOOL animated) {
         overlay.stage.alpha = open ? 1 : 0;
         overlay.stage.transform = open ? CGAffineTransformIdentity
                                        : CGAffineTransformMakeScale(kLyricsEnterScale, kLyricsEnterScale);
-        sg_sing.alpha = open ? 1 : 0;
     };
     void (^settled)(BOOL) = ^(BOOL finished) {
         sg_moving = NO;
@@ -649,7 +639,6 @@ static void replace(void) {
     overlay.lyrics.frame = overlay.stage.bounds;
     [overlay.lyrics setLineInsets:bandOf(l, sg_alone) duration:0];
     if (sg_alone) showControls(0, overlay);
-    placeSing(overlay, l);
     SGRPlayerCoverList().alpha = 0;
 }
 
@@ -781,7 +770,7 @@ static void awaitLyrics(void) {
 // the microphone follow at once, and lyrics that were open only for Sing put the cover back.
 static void singAvailabilityChanged(void) {
     static BOOL available;
-    if (SGSingAvailable() == available) return;
+    if (singAvailable() == available) return;
     available = !available;
     SGRPlayerLyricsChanged();
     if (!sg_open) return;
@@ -823,10 +812,10 @@ static SGRPlayerLyricsWatcher *sg_watcher;
     %init;
     sg_watcher = [SGRPlayerLyricsWatcher new];
     SGAddPlayerStateObserver(sg_watcher);
-    [NSNotificationCenter.defaultCenter addObserverForName:SGKaraokeLinesDidChangeNotification object:nil queue:nil usingBlock:^(NSNotification *note) {
+    [NSNotificationCenter.defaultCenter addObserverForName:SGKaraokeLinesKeptNotification object:nil queue:nil usingBlock:^(NSNotification *note) {
         SGRPlayerLyricsChanged();
     }];
-    [NSNotificationCenter.defaultCenter addObserverForName:SGSingDidChangeNotification object:nil queue:nil usingBlock:^(NSNotification *note) {
+    [NSNotificationCenter.defaultCenter addObserverForName:SGSingChangedNotification object:nil queue:nil usingBlock:^(NSNotification *note) {
         singAvailabilityChanged();
     }];
     [NSNotificationCenter.defaultCenter addObserverForName:UIApplicationDidBecomeActiveNotification object:nil

@@ -10,6 +10,8 @@
 #import "Core/SGCore.h"
 #import "SGRKaraokeView.h"
 #import "LyricsText.h"
+#import "SGRSingButton.h"
+#import "Shared/Sing/Sing.h"
 #import "MeaningSheet.h"
 #import "Shared/LyricsSources/LyricsSources.h"
 #import "Shared/Player/PlayerEvents.h"
@@ -1064,14 +1066,15 @@ typedef struct {
     SGRKaraokeStyle *_style;   // how the lines were laid out
     BOOL _hasSpoken, _hasTranslation;   // whether the song has any line with either
     UIButton *_extras;
+    SGRSingButton *_sing;   // across from _extras
     CGFloat _builtWidth;
     BOOL _showing;
     CAGradientLayer *_fade;
     UILabel *_credit;
-    SGLyricsCredit *_credited;   // what the lines are credited to, nil while the page asks every frame
+    NSString *_creditSource;   // what the lines are credited to, nil while the page asks every frame
+    NSArray<SGLyricsLink *> *_creditLinks;   // the people it links to, where its terms want them
     CGFloat _fontSize, _margin, _lineGap, _blurPerLine, _maxBlur;
     BOOL _crediting;   // Show source, read once
-    BOOL _asksCredit;  // with a source of the mod's on, a credit its terms require shows either way
     double _clock;
     NSInteger _reported;
     CFTimeInterval _clockTime;
@@ -1115,9 +1118,12 @@ typedef struct {
     _credit.hidden = YES;
     _credit.numberOfLines = 2;
     _crediting = SGFlag(SGKeyLyricsCredit, NO);
-    _asksCredit = _crediting || SGLyricsActive();
     _sweepsEstimates = SGFlag(SGKeyLyricsSimulateWords, NO);
     [self addSubview:_credit];
+    _sing = [SGRSingButton new];
+    _sing.hidden = !SGEnabled(SGKeySingButton);
+    [self addSubview:_sing];
+    [NSNotificationCenter.defaultCenter addObserver:self selector:@selector(singButtonChanged) name:SGSingButtonDidChangeNotification object:nil];
     [self addGestureRecognizer:[[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(tapped:)]];
     [self addGestureRecognizer:[[UILongPressGestureRecognizer alloc] initWithTarget:self action:@selector(held:)]];
     [NSNotificationCenter.defaultCenter addObserver:self selector:@selector(playerTransitionChanged:) name:SGPlayerTransitionNotification object:nil];
@@ -1136,11 +1142,17 @@ typedef struct {
     free(_breaks);
 }
 
+// Karaoke's settings switched the mic off or on: hidden at once, Karaoke itself as it was.
+- (void)singButtonChanged {
+    _sing.hidden = !SGEnabled(SGKeySingButton);
+}
+
 - (void)tapped:(UITapGestureRecognizer *)tap {
     if (self.takesTap && !self.takesTap()) return;
+    if (_sing.userInteractionEnabled && [_sing pointInside:[tap locationInView:_sing] withEvent:nil]) return;
     if (_extras && !_extras.hidden && CGRectContainsPoint(_extras.frame, [tap locationInView:self])) return;
-    if (_credited.links.count && !_credit.hidden && CGRectContainsPoint(CGRectInset(_credit.frame, -8, -8), [tap locationInView:self])) {
-        SGLyricsOpenCredit(_credited);
+    if (_creditLinks.count && !_credit.hidden && CGRectContainsPoint(CGRectInset(_credit.frame, -8, -8), [tap locationInView:self])) {
+        SGLyricsOpenCreditLinks(_creditLinks, _credit);
         return;
     }
     CGPoint point = [tap locationInView:_scroll];
@@ -1163,6 +1175,7 @@ typedef struct {
 
 - (void)held:(UILongPressGestureRecognizer *)hold {
     if (hold.state != UIGestureRecognizerStateBegan || !_meanings.count) return;
+    if (_sing.userInteractionEnabled && [_sing pointInside:[hold locationInView:_sing] withEvent:nil]) return;
     CGPoint point = [hold locationInView:_scroll];
     for (SGRKaraokeLineView *view in _shown.allValues) {
         if (!CGRectContainsPoint(CGRectInset(view.frame, -_margin, -_lineGap / 2), point)) continue;
@@ -1209,6 +1222,8 @@ typedef struct {
     _extrasHidden = hidden;
     _extras.alpha = hidden ? 0 : 1;
     _extras.userInteractionEnabled = !hidden;
+    // Sing's mic goes with the rest, unless the host keeps it: its glass dematerializes in the host's animation.
+    _sing.tucked = hidden && !_keepsSing;
 }
 
 - (void)scrollViewDidScroll:(UIScrollView *)scrollView {
@@ -1309,6 +1324,7 @@ typedef struct {
     CGSize fits = [_credit sizeThatFits:CGSizeMake(room, CGFLOAT_MAX)];
     _credit.bounds = CGRectMake(0, 0, MIN(fits.width, room), fits.height);
     CGFloat bottom = self.bounds.size.height - _band.bottom;
+    _sing.frame = CGRectMake(self.bounds.size.width - _margin - kExtrasSide, bottom - kExtrasSide - kExtrasBottom, kExtrasSide, kExtrasSide);
     _credit.frame = CGRectMake(_margin, bottom - _credit.bounds.size.height - kCreditBottom,
                                _credit.bounds.size.width, _credit.bounds.size.height);
     if (extras) {
@@ -1684,9 +1700,13 @@ typedef struct {
     _dots.frame = CGRectMake(_margin, top, _builtWidth - 2 * _margin, _dots.bounds.size.height);
 }
 
-- (void)creditTo:(SGLyricsCredit *)credit {
-    _credited = credit;
-    NSString *text = credit.text.length && _crediting ? [NSString stringWithFormat:@"Lyrics from %@", credit.text] : nil;
+- (void)creditTo:(NSString *)source {
+    _creditSource = source;
+    // Shown when Show source is on, or the source's terms require it (Spicy Lyrics).
+    BOOL shown = source.length && (_crediting || SGLyricsCreditRequired(source));
+    NSString *text = shown ? [NSString stringWithFormat:@"Lyrics from %@", source] : nil;
+    _creditLinks = shown ? SGLyricsCreditLinks(source) : nil;
+    _credit.accessibilityTraits = _creditLinks.count ? UIAccessibilityTraitLink : UIAccessibilityTraitStaticText;
     if (text == _credit.text || [text isEqualToString:_credit.text]) return;
     _credit.text = text;
     _credit.hidden = !_showing || !text.length;
@@ -1756,7 +1776,7 @@ typedef struct {
     }
     [self setShowing:_tops != nil];
     // The source is settled a moment after the lines are, so it is asked for until it answers.
-    if (_asksCredit && _lines && !_credited) [self creditTo:SGLyricsCreditFor(track)];
+    if (_lines && !_creditSource) [self creditTo:SGLyricsCreditFor(track)];
     if (!_tops) return;
     [self alignFade];
     if (_plain) {

@@ -27,9 +27,7 @@
 #import <AVFoundation/AVFoundation.h>
 #import "Core/SGCore.h"
 #import "Redesigned/Kit/SGRKit.h"
-#import "Shared/LockScreenArtwork/SGAppleArtwork.h"
-#import "Shared/LockScreenArtwork/SGArtworkFile.h"
-#import "Shared/LockScreenArtwork/SGCanvas.h"
+#import "Shared/AnimatedArtwork/AnimatedArtwork.h"
 #import "Album.h"
 
 // How much of the cover's height the dissolve into the field covers, and the scrim over the top of it that
@@ -133,7 +131,6 @@ static char kReadyContext;
     CAGradientLayer *_scrim, *_dissolve;
     __weak UIImageView *_cover;
     NSString *_motionFor;
-    NSURLSessionTask *_fetch;
     AVQueuePlayer *_player;
     AVPlayerLooper *_looper;
     AVPlayerLayer *_motion;
@@ -168,7 +165,6 @@ static char kReadyContext;
 
 - (void)dealloc {
     [NSNotificationCenter.defaultCenter removeObserver:self];
-    [_fetch cancel];
     [_motion removeObserver:self forKeyPath:@"readyForDisplay" context:&kReadyContext];
     [_player pause];
 }
@@ -216,22 +212,16 @@ static char kReadyContext;
     if ([_motionFor isEqualToString:wanted]) return;
     _motionFor = wanted;
     __weak SGRAlbumHero *weakSelf = self;
-    SGAppleArtworkFind(artist, album, NO, ^(SGCanvas *canvas, NSString *note) {
+    // The player's size: at the screen's full width a square cover ran to the 1920 stream, tens of MB.
+    SGMotionAlbumCover(artist, album, SGMotionSquare, SGMotionPixels(), ^(NSURL *file) {
         SGRAlbumHero *hero = weakSelf;
         if (!hero || ![hero->_motionFor isEqualToString:wanted]) return;
-        if (!canvas) {
-            SGLog(@"redesign album: no animated cover for \"%@\": %@", album, note);
+        if (!file) {
+            SGLog(@"redesign album: no animated cover for \"%@\"", album);
             return;
         }
-        hero->_fetch = SGArtworkFetchAside(canvas.identifier, canvas.address, ^(NSURL *file, NSString *fetched) {
-            dispatch_async(dispatch_get_main_queue(), ^{
-                SGRAlbumHero *owner = weakSelf;
-                if (!owner || ![owner->_motionFor isEqualToString:wanted]) return;
-                owner->_fetch = nil;
-                SGLog(@"redesign album: animated cover for \"%@\", %@", album, fetched);
-                if (file) [owner playMotion:file];
-            });
-        });
+        SGLog(@"redesign album: animated cover for \"%@\"", album);
+        [hero playMotion:file];
     });
 }
 

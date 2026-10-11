@@ -5,7 +5,8 @@
 #import "Settings/SGModPage.h"
 #import "Settings/SGPageStyle.h"
 #import "Redesigned/Kit/SGRKit.h"
-#import "Shared/LockScreenArtwork/LockScreenArtwork.h"
+#import "Shared/AnimatedArtwork/AnimatedArtwork.h"
+#import "Shared/Player/SpeedPitch.h"
 #import "Player.h"
 
 NSNotificationName const SGRPlayerFluidLookDidChangeNotification = @"spotifyglass.redesign.player.fluidLookDidChange";
@@ -49,6 +50,21 @@ SGRPlayerBackground SGRPlayerBackgroundStyle(void) {
     migrate();
     NSInteger style = SGInt(SGRKeyPlayerBackground, kDefaultBackground);
     return style >= SGRPlayerBackgroundFluid && style <= SGRPlayerBackgroundAnimated ? (SGRPlayerBackground)style : kDefaultBackground;
+}
+
+// The ⋯ menu's Animated artwork switch (Shared/Player/SpeedPitchMenu.x puts it under the sliders of the sheet
+// that is shown after all): Fluid and Animated artwork share the field, so the choice moves at once.
+BOOL SGPlayerMenuOffersAnimatedArtwork(void) {
+    return SGRedesignedUI();
+}
+
+BOOL SGPlayerMenuAnimatedArtwork(void) {
+    return SGRPlayerBackgroundStyle() == SGRPlayerBackgroundAnimated;
+}
+
+void SGPlayerMenuSetAnimatedArtwork(BOOL on) {
+    SGSetInt(SGRKeyPlayerBackground, on ? SGRPlayerBackgroundAnimated : SGRPlayerBackgroundFluid);
+    [NSNotificationCenter.defaultCenter postNotificationName:SGRPlayerBackgroundDidChangeNotification object:nil];
 }
 
 SGRWarpLook SGRPlayerFluidLook(void) {
@@ -150,8 +166,9 @@ NSArray<SGModSection *> *SGRPlayerBackgroundSections(void) {
     reset.color = SGRed();
     reset.symbol = @"arrow.counterclockwise";
 
-    SGModRow *sources = SGArtworkSourcesRow(SGRKeyPlayerArtworkSources,
-        @"Asked top to bottom until one has a clip. Apple Music gets only the artist and album name.");
+    // The sources are asked top to bottom until one has a clip, in the one order the lock screen uses too.
+    SGModRow *sources = SGMotionSourcesRow();
+    SGModRow *lowData = SGOptionRow(@"Download in Low Data Mode", @"Up to about 7 MB a song", SGKeyMotionLowData);
 
     return @[
         SGNotedSection(@"Background", choices, @"A paused song holds the background still."),
@@ -159,7 +176,7 @@ NSArray<SGModSection *> *SGRPlayerBackgroundSections(void) {
         SGNotedSection(nil, shownFor(SGRPlayerBackgroundFluid, sliders),
                        @"The player follows these as they move. Brightness past 100% can make white text harder to read on a light cover."),
         SGSection(nil, shownFor(SGRPlayerBackgroundFluid, @[reset])),
-        SGNotedSection(nil, shownFor(SGRPlayerBackgroundAnimated, @[sources]),
+        SGNotedSection(nil, shownFor(SGRPlayerBackgroundAnimated, @[sources, lowData]),
                        @"A track without a clip shows Fluid artwork, and so does every track in Low Power Mode or with Reduce Motion on."),
     ];
 }
