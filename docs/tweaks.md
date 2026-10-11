@@ -419,17 +419,16 @@ Redesigned:
                   glass stays on the track and Spotify's Jam strip gets a pane of its own above it (harness/tabbar/, jam)
     Player/       the redesigned full screen player (Player.h lists its files), on Spotify Free's units too (a Free
                   account with pick and shuffle gets NowPlayingReinventFreeMode, whose units are classes of their own
-                  around the same elements, and each unit hook covers both); its ⋯ opens a menu the way the
-                  Music app draws one (PlayerMenu.x, SGRPlayerMenu.m): a pane of glass grown out of the button,
-                  Add to playlist, Add to Queue and Share as three tiles across its top, groups of rows under
-                  them, Speed and pitch opening onto Shared/Player's sliders in place, everything else Spotify
-                  offers under More, and Remove from this playlist last in red. What is in it and what each row
-                  does stay Spotify's: its own sheet still opens, out of sight, and the menu is read off its
-                  table, each row placed by the number Spotify's ListRow carries as its identifier and fired
-                  through that ListRow; a page Spotify pushes onto the sheet (Share's destinations) shows the
-                  sheet, and a sheet with no rows within 4 s is shown as it is. It opens on the rows the last
-                  menu had, kept across launches, and moves to Spotify's as they come in, a tap meanwhile held
-                  until they do. Always on in the redesign. Tested in the simulator against harness/playermenu/
+                  around the same elements, and each unit hook covers both); its ⋯ opens the system menu, as the ⋯ of every
+                  redesigned entity page does (Redesigned/ContextMenu, whose ContextMenu.h says how): a button of the mod's over
+                  Spotify's ⋯ takes its touch and opens the menu at touch down, as UIKit opens any button's menu, so it waits on
+                  nothing of Spotify's. Share, Add to playlist and Add to queue are a row of three at its top, then
+                  PlayerMenu.m's own items (Speed, Pitch & Reverb, and the switches between the Fluid, Animated and
+                  Visualizer backgrounds), then More with the rest of Spotify's rows. What is in it and what each row does stay
+                  Spotify's: its own sheet is made out of sight, read, and a pick is fired on it; the last complete set of rows
+                  is kept across launches, and a pick made before the live rows are in waits up to 4 s for them, else the sheet
+                  is shown. A page's ⋯ (playlist, album, artist) opens Spotify's sheet at alpha 0 and the menu over it from an
+                  anchor inside the ⋯. Always on in the redesign
                   With Sing on and its voice model downloaded (Mod Settings > Karaoke, Redesigned/Lyrics/SingSettings.m,
                   both applying at once), its microphone (Redesigned/Lyrics/SGRSingControl.m) sits in the
                   lyrics' bottom trailing corner, opposite their glass button, and goes down with the lines when the
@@ -573,16 +572,19 @@ Player: Lock screen widget (its controls and, under Artwork, Animated lock scree
 in the native look also Now playing bar (its device button and its flags), Queue & devices, and
 Spotify's own player screen (artwork background, glass header buttons, Disable Canvas and the sheet,
 header, slider and sticky header flags, the cards under the player and the lyrics preview and player
-buttons to hide); in the redesign instead, right on the Player page, its device button and the Background behind the player: Fluid
-artwork, the default, the cover itself Kawase blurred and warped on Metal, ported from kawarp (Redesigned/Kit/SGRWarp.m), or the
+buttons to hide); in the redesign instead, the Player page (Redesigned/Player/PlayerSettings.m), which leads with a card of the
+player as the playing track shows on it and a control for the Background behind the player, five of them: Still, the cover blurred and
+held still (Kit/SGRField.m's backdrop); Colors, its colours drifting (Kit/SGRFlow.m); Fluid artwork, the default, the cover itself
+blurred and slowly turning (Kit/SGRFluid.m, five sliders: Speed, Warp, Blur, Saturation and Brightness, with Reset); the
 Visualizer, a calm spectrum of what plays in two soft hills of the cover's colours over Fluid artwork held still (PlayerVisualiser.m,
 SGRSpectrum.m: Spotify's output read through the audio effects' notify, 24 bands, drawn at 60 frames a second, 30 behind the lyrics,
 stopped in Low Power Mode and with Reduce Motion on), or Animated
 artwork, the track's Canvas or the album's Apple Music 3:4 cover looping muted over it (Redesigned/Player/PlayerAnimated.x), the square cover fading out as it fades in and back as it goes, found
 the lock screen's way in an order of its own (a Sources page) and falling back to Fluid artwork for a track
 without a clip, while one is fetched, while Spotify shows its own music video, and in Low Power Mode or with Reduce Motion on; the
-choice is picked in place, applies at once and brings its own settings up under it: for Fluid artwork a live preview over Speed,
-Warp, Blur, Saturation and Brightness, which the player follows as they move, and Reset; for the Visualizer the same preview with the hills over it and the same sliders (it takes Fluid artwork's look); for Animated artwork its Sources; laid out against harness/kawarp/, the player's side against harness/player/ (its fluid and
+choice: Fluid, Animated and the Visualizer share the Fluid field, so a change between them applies at once, while Still and Colors are made once a
+launch and apply after a restart; the rows under the card follow the choice: Fluid's sliders (the Visualizer and Animated artwork take its
+look where they show Fluid), Animated artwork's Sources; the card's own clip preview is not drawn, the clip playing in the player; laid out against harness/kawarp/, the player's side against harness/player/ (its fluid and
 animated scenarios). Then a Controls card: Volume (on until switched off; PlayerVolume.m), the system's slider under the controls for this iPhone or the Connect device's, and
 Follow the cover (off until switched on; PlayerCoverAccent.x), which paints Spotify's lit like, shuffle and repeat in the most colourful of the cover's
 five colours instead of the accent, once per cover, a grey cover giving the accent back: Spotify bakes the accent into those controls' images, backgrounds and
