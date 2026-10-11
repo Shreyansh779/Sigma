@@ -106,7 +106,7 @@ static void appendTab(NSDictionary *tab) {
 }
 
 - (CGFloat)tableView:(UITableView *)table heightForHeaderInSection:(NSInteger)section {
-    return SGSectionHeaderHeight();
+    return SGSectionHeaderHeight;
 }
 
 - (CGFloat)tableView:(UITableView *)table heightForFooterInSection:(NSInteger)section {
@@ -505,7 +505,7 @@ typedef NS_ENUM(NSInteger, SGRNavbarSection) {
 }
 
 - (CGFloat)tableView:(UITableView *)table heightForHeaderInSection:(NSInteger)section {
-    return [self headerFor:section] ? SGSectionHeaderHeight() : SGSectionGap;
+    return [self headerFor:section] ? SGSectionHeaderHeight : SGSectionGap;
 }
 
 - (UIView *)tableView:(UITableView *)table viewForFooterInSection:(NSInteger)section {
