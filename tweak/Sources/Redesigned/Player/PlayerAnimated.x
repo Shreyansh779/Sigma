@@ -584,9 +584,9 @@ static void spotifyVideo(id owner, BOOL attached) {
     sg_watcher = [SGRPlayerAnimatedWatcher new];
     SGAddPlayerStateObserver(sg_watcher);
     NSNotificationCenter *center = NSNotificationCenter.defaultCenter;
-    sg_picked = SGRPlayerBackgroundStyle() == SGRPlayerBackgroundAnimated;
+    sg_picked = SGRPlayerBackground() == SGRPlayerBackgroundAnimated;
     [center addObserverForName:SGRPlayerBackgroundDidChangeNotification object:nil queue:NSOperationQueue.mainQueue usingBlock:^(NSNotification *note) {
-        sg_picked = SGRPlayerBackgroundStyle() == SGRPlayerBackgroundAnimated;
+        sg_picked = SGRPlayerBackground() == SGRPlayerBackgroundAnimated;
         say(@"%@ picked", sg_picked ? @"Animated artwork" : @"Fluid artwork");
         update();
     }];

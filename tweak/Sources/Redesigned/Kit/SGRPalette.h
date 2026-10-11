@@ -11,9 +11,14 @@
 #import <UIKit/UIKit.h>
 
 typedef struct {
+    // The area a backdrop bitmap covers, in points; CGSizeZero when none is wanted. The bitmap is the
+    // artwork filling that area, blurred, dimmed from 0.25 black at the top to 0.45 (0.55 with AMOLED) at 55% of
+    // the height, and transparent from 55% down to the bottom, so the field colour under it shows through.
+    CGSize backdropSize;
     // A blurred copy at the artwork's own aspect, transparent down to 55% of its height and opaque
     // from 85%, to lay over the sharp picture with the same aspect fill.
     BOOL dissolve;
+    BOOL amoled;
     // The colours of a moving background (flowColors below): the artwork's main colour in each quarter and overall.
     BOOL flow;
 } SGRPaletteRequest;
@@ -21,6 +26,7 @@ typedef struct {
 @interface SGRPalette : NSObject
 @property (nonatomic, readonly) UIColor *edgeColor;
 @property (nonatomic, readonly) UIColor *fieldColor;
+@property (nonatomic, readonly) UIImage *backdrop;   // nil unless asked for, at most 160px wide
 @property (nonatomic, readonly) UIImage *dissolve;   // nil unless asked for, 96px wide
 // nil unless asked for: top left, top right, bottom left, bottom right, then the whole artwork's, each the
 // dominant colour there, its saturation lifted a little and its luminance held between 0.03 and 0.13, so white
