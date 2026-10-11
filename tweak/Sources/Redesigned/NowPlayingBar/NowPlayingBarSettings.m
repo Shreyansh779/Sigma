@@ -21,14 +21,3 @@ NSArray<SGModRow *> *SGRNowPlayingBarRows(void) {
         SGHideRow(@"Hide the device button", @"On the full now playing bar", SGRHideBarConnect),
     ];
 }
-
-NSArray<SGModSection *> *SGRNowPlayingSections(void) {
-    return [@[
-        SGNotedSection(@"Mini player", SGRNowPlayingBarRows(),
-                       @"Apple Music style moves the now playing bar in between two tabs as you scroll down."),
-        SGNotedSection(@"Controls", @[SGSwitchRow(@"Volume", nil, SGRKeyPlayerVolume),
-                                      SGSwitchRow(@"Follow the cover", nil, SGRKeyPlayerFollowsCover)],
-                       @"Volume puts a slider under the controls for this iPhone, or the speaker's while Spotify plays on another device. "
-                       @"Follow the cover paints the like, shuffle and repeat in the colour of the song playing."),
-    ] arrayByAddingObjectsFromArray:SGRPlayerBackgroundSections()];
-}

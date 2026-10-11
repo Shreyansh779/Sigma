@@ -18,10 +18,6 @@
 // row, and the device button hidden on the full card.
 NSArray<SGModRow *> *SGRNowPlayingBarRows(void);
 
-// The redesign's rows on the Player page (App/Pages.m puts them there): the bar and what moves behind the
-// player, the volume slider.
-NSArray<SGModSection *> *SGRNowPlayingSections(void);
-
 // The bar's glass card in `host`'s coordinates, with its corner radius; CGRectNull before the bar has
 // been styled or while it is out of a window (NowPlayingBar.x). The bar keeps its geometry while
 // Spotify hides it for the player's open and close.

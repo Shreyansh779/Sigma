@@ -11,7 +11,7 @@
 //     PlayerVisualiser.m the Visualizer background: a calm spectrum of the song in the cover's colours, read
 //                        through SGRSpectrum.m from the audio effects' tap on Spotify's output
 //     PlayerCoverAccent.x  Follow the cover: the like, shuffle and repeat painted in the cover's colour
-//     PlayerBackgroundSettings.m  what moves behind the player, and Fluid artwork's sliders under a preview
+//     PlayerSettings.m   the Player page: a card of the player, what moves behind it, its settings
 //     PlayerArtwork.x    the cover's corners, shadow and paused shrink, the lyric preview under it hidden,
 //                        and every cover gone while an Animated artwork clip shows
 //     PlayerHeader.x     glass behind the close and more buttons
@@ -35,37 +35,32 @@
 // Every hook installs only while Redesigned UI is on (SGRedesignedUI); the native look's do not then.
 // Threading: main thread only.
 #import <UIKit/UIKit.h>
-#import "Redesigned/Kit/SGRWarp.h"
 
 @class SGRArtworkField, SGModSection;
 
-#pragma mark - the background (PlayerBackgroundSettings.m)
+#pragma mark - the background (PlayerSettings.m)
 
-// What moves behind the player, picked on Mod Settings' Player page (Redesigned/NowPlayingBar/
-// NowPlayingBarSettings.m), stored as the index. Every value of the choice it replaced (Still artwork,
-// Colour flow, Fluid artwork) and of the Moving background switch before that reads as Fluid artwork.
-#define SGRKeyPlayerBackground @"spotifyglass.redesign.player.backdrop"
-#define SGRKeyPlayerBackgroundWas @"spotifyglass.redesign.player.background"
+// What is behind the player, chosen on the Player page (PlayerSettings.m), stored as the index. Sigma's choice
+// before this one (Fluid artwork, Animated artwork, the Visualizer as 0 to 2) moves over under the new indexes.
+#define SGRKeyPlayerBackground @"spotifyglass.redesign.player.background"
+#define SGRKeyPlayerBackgroundWas @"spotifyglass.redesign.player.backdrop"
 #define SGRKeyPlayerMotionWas @"spotifyglass.redesign.player.movingBackground"
-typedef NS_ENUM(NSInteger, SGRPlayerBackground) {
-    SGRPlayerBackgroundFluid,      // the artwork itself warped (SGRWarp.h)
+typedef NS_ENUM(NSInteger, SGRPlayerBackgroundKind) {
+    SGRPlayerBackgroundStill,      // the artwork blurred and held still
+    SGRPlayerBackgroundColours,    // the artwork's colours drifting (SGRFlow.h)
+    SGRPlayerBackgroundFluid,      // the artwork itself blurred and turning (SGRFluid.h)
     SGRPlayerBackgroundAnimated,   // a clip over Fluid artwork, where the track has one (PlayerAnimated.x)
     SGRPlayerBackgroundVisualiser, // a spectrum of the song over Fluid held still (PlayerVisualiser.m)
 };
-SGRPlayerBackground SGRPlayerBackgroundStyle(void);
+// Fluid artwork, Animated artwork and the Visualizer share a field, so the choice moves between them at once;
+// Still and Colors are a field of another kind, made once a launch.
+SGRPlayerBackgroundKind SGRPlayerBackground(void);
+NSArray<NSString *> *SGRPlayerBackgroundNames(void);
 // Posted when the choice changes, so the player follows without a restart.
 extern NSNotificationName const SGRPlayerBackgroundDidChangeNotification;
-// Fluid artwork's sliders, whole numbers: speed, warp, saturation and brightness in percent, blur in passes.
-#define SGRKeyFluidSpeed @"spotifyglass.redesign.player.fluid.speed"
-#define SGRKeyFluidWarp @"spotifyglass.redesign.player.fluid.warp"
-#define SGRKeyFluidBlur @"spotifyglass.redesign.player.fluid.blur"
-#define SGRKeyFluidSaturation @"spotifyglass.redesign.player.fluid.saturation"
-#define SGRKeyFluidBrightness @"spotifyglass.redesign.player.fluid.brightness"
-SGRWarpLook SGRPlayerFluidLook(void);
-// Posted as a slider moves or the page resets them, so the player's field and the preview follow at once.
-extern NSNotificationName const SGRPlayerFluidLookDidChangeNotification;
-// The Player page's sections for the background: the choice, then the settings of the one picked.
-NSArray<SGModSection *> *SGRPlayerBackgroundSections(void);
+// The Player page, the redesign's: a card of the player with the background's control under it, the rows
+// that follow the choice, Controls and the Mini player, then `more` (App/Pages.m).
+UIViewController *SGRPlayerSettingsPage(NSArray *more);
 
 #pragma mark - the ⋯ menu (PlayerMenu.x)
 
