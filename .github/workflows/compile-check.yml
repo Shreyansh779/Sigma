@@ -37,7 +37,7 @@ jobs:
 
       - name: Flag table cache
         id: flags
-        uses: actions/cache@v4
+        uses: actions/cache/restore@v4
         with:
           path: tweak/Sources/Shared/Flags/SGFlagList.m
           key: flag-table-${{ hashFiles('scripts/extract-flags.py') }}
@@ -53,6 +53,13 @@ jobs:
           [ -n "$URL" ] || { echo "::error::No ipa_url given and no IPA_URL secret set"; exit 1; }
           curl -fsSL "$URL" -o ipa/spotify.ipa
           ./scripts/extract-flags.py ipa/spotify.ipa
+
+      - name: Keep the flag table
+        if: steps.flags.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: tweak/Sources/Shared/Flags/SGFlagList.m
+          key: flag-table-${{ hashFiles('scripts/extract-flags.py') }}
 
       - name: Compile
         run: |
