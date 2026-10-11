@@ -19,6 +19,9 @@
 #import "Redesigned/Home/Home.h"
 #import "Shared/Fonts/Fonts.h"
 #import "Shared/Gestures/Gestures.h"
+#import "Shared/LyricsTranslation/LyricsTranslation.h"
+#import "Shared/Sing/Sing.h"
+#import "Redesigned/Lyrics/LyricsLook.h"
 
 NSString *const SGRedesignedUIInfo = @"The newest version of Sigma, leaning towards Apple Music's style. It is not compatible with the legacy look's settings.\n\nThe legacy look gives you more freedom, yet still looks like Spotify.";
 
@@ -69,20 +72,38 @@ UIViewController *SGNavbarPage(void) {
     return SGRedesignedUIStored() ? SGRNavbarSettingsPage() : SGNavbarSettingsPage();
 }
 
-// Pronunciation, translation, word sweeping and line meanings exist only in the redesign's lyrics.
-UIViewController *SGLyricsSettingsPage(void) {
+// Pronunciation, romanized lines, translation, word sweeping and line meanings exist only in the redesign's lyrics view.
+static UIViewController *lyricsPage(void) {
     BOOL redesigned = SGRedesignedUIStored();
     NSMutableArray<SGModRow *> *more = [NSMutableArray arrayWithObject:SGLockScreenLyricsRow()];
     if (!redesigned) [more insertObject:SGGlassLyricsRow() atIndex:0];
-    NSMutableArray<SGModSection *> *sections = [NSMutableArray arrayWithObject:SGLyricsSourcesSection(redesigned)];
-    [sections addObject:SGNotedSection(@"Timing", @[SGLyricsDelayRow()],
-        @"Every line shows this much later than the song, for Bluetooth headphones that play a little behind the lyrics. Applies at once.")];
+    SGModRow *sing = SGPageRow(@"Karaoke", ^UIViewController *{ return SGSingSettingsPage(); });
+    sing.value = ^NSString *{ return SGSingSummary(); };
+    NSMutableArray<SGModSection *> *sections = [NSMutableArray arrayWithObjects:SGSection(nil, @[SGWithTile(sing, @"music.mic", UIColor.systemRedColor)]),
+                                                SGLyricsSourcesSection(redesigned), nil];
+    SGModSection *timing = SGNotedSection(@"Timing", @[SGLyricsDelayRow()],
+        @"Every line shows this much later than the song, for Bluetooth headphones that play a little behind the lyrics. Applies at once.");
     if (redesigned) {
-        [sections addObject:SGSection(@"Display", @[SGLyricsWordTimingRow(), SGRLyricsTextSizesRow(), SGLyricsTranslationLanguageRow(), SGLyricsMeaningsRow(),
-            SGSwitchRow(@"Landscape lyrics", @"Turn the phone with the lyrics open", SGRKeyLyricsLandscape)])];
+        [sections addObjectsFromArray:@[
+            SGSection(@"Display", @[SGRLyricsTextSizesRow(), SGLyricsWordTimingRow(), SGLyricsRomanisedRow(),
+                SGSwitchRow(@"Hide the controls", @"A few seconds after the last touch, the lyrics take the whole player", SGRKeyLyricsAutoHide),
+                SGSwitchRow(@"Landscape lyrics", @"Turn the phone with the lyrics open", SGRKeyLyricsLandscape)]),
+            timing,
+            SGSection(@"Translation", @[SGLyricsTranslationLanguageRow(), SGTranslateEverySongRow(), SGGeminiKeyRow(), SGSavedTranslationsRow()]),
+            SGSection(nil, @[SGLyricsMeaningsRow()]),
+        ]];
+    } else {
+        [sections addObject:timing];
     }
     [sections addObject:SGSection(nil, more)];
+    // The redesign's page leads with its lyrics playing in the look the page sets, and that look's presets.
+    if (redesigned) return SGRLyricsSettingsPage(@"Lyrics", @"The look applies at once. The settings below apply after you restart Spotify.", sections);
     return [[SGModPage alloc] initWithTitle:@"Lyrics" intro:SGRestartNote sections:sections footer:nil];
+}
+
+// Lyrics has its own row on Mod Settings' main page, beside Sing.
+UIViewController *SGLyricsSettingsPage(void) {
+    return lyricsPage();
 }
 
 UIViewController *SGPlayerSettingsPage(void) {

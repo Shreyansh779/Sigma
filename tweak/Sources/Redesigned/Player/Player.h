@@ -148,6 +148,10 @@ BOOL SGRPlayerLyricsAvailable(void);
 BOOL SGRPlayerLyricsOpen(void);
 // Shows them, or puts the cover back; does nothing when there are none to show.
 void SGRPlayerToggleLyrics(void);
+// The controls under the lines fade a few seconds after the last touch while the lyrics play, and the
+// lines grow down into their room (PlayerLyrics.x). On until switched off; a scroll through the lines
+// hides them either way.
+#define SGRKeyLyricsAutoHide @"spotifyglass.redesign.lyrics.autoHide"
 // Called by PlayerLyrics.x whenever either of those two changed, so the footer's lyrics glyph follows
 // (PlayerFooter.x). It returns at once when nothing changed.
 void SGRPlayerLyricsChanged(void);
