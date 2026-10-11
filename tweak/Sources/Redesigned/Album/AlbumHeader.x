@@ -205,7 +205,7 @@ static char kReadyContext;
 }
 
 - (void)findMotionOf:(NSString *)album by:(NSString *)artist {
-    if (!album.length || !artist.length || !SGEnabled(SGRKeyAlbumMotion) && SGMotionAppleMusicOn()) return;
+    if (!album.length || !artist.length || !SGEnabled(SGRKeyAlbumMotion) || !SGMotionAppleMusicOn()) return;
     // Not even looked up while it could not move: the clip is megabytes.
     if (SGRReduceMotion() || NSProcessInfo.processInfo.lowPowerModeEnabled) return;
     NSString *wanted = [NSString stringWithFormat:@"%@\n%@", artist, album];
