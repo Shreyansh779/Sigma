@@ -440,3 +440,15 @@ void SGRPlayerVisualiserUpdate(void) {
     }
 }
 
+#pragma mark - the menu's switch
+
+void SGRPlayerMenuSetBackground(SGRPlayerBackgroundKind kind) {
+    SGRPlayerBackgroundKind current = SGRPlayerBackground();
+    if (!SGPlayerMenuOffersAnimatedArtwork() || kind < SGRPlayerBackgroundFluid || kind == current) return;
+    // Animated's own switch lets the clip go or looks it up, and calls back here.
+    if (kind == SGRPlayerBackgroundAnimated || current == SGRPlayerBackgroundAnimated) SGPlayerMenuSetAnimatedArtwork(kind == SGRPlayerBackgroundAnimated);
+    if (kind != SGRPlayerBackgroundAnimated) SGSetInt(SGRKeyPlayerBackground, kind);
+    SGLog(@"redesign player: background switched to %@ from the menu", SGRPlayerBackgroundNames()[(NSUInteger)kind]);
+    SGRPlayerHoldField();
+    SGRPlayerVisualiserUpdate();
+}

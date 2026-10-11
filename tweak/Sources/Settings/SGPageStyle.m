@@ -313,11 +313,3 @@ NSArray<NSString *> *SGSupportedSpotifyVersions(void) {
 NSArray<NSString *> *SGLikelyWorksSpotifyVersions(void) {
     return @[@"9.1.90"];
 }
-
-void SGOpenURL(NSString *url) {
-    NSURL *target = url ? [NSURL URLWithString:url] : nil;
-    if (!target) return;
-    dispatch_async(dispatch_get_main_queue(), ^{
-        [UIApplication.sharedApplication openURL:target options:@{} completionHandler:nil];
-    });
-}
