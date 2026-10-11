@@ -33,14 +33,14 @@ static NSArray<SGIncompatibility *> *incompatibilities(void) {
         NSString *version = runningVersion();
         if (version && ![SGSupportedSpotifyVersions() containsObject:version]
             && ![SGLikelyWorksSpotifyVersions() containsObject:version]) {
-            NSString *list = [SGSupportedSpotifyVersions() componentsJoinedByString:@" or "];
+            NSString *versions = [SGSupportedSpotifyVersions() componentsJoinedByString:@" or "];
             SGIncompatibility *wrong = [SGIncompatibility new];
             wrong.title = [NSString stringWithFormat:@"Spotify %@ isn't supported", version];
-            wrong.subtitle = [NSString stringWithFormat:@"The mod is made for %@", list];
+            wrong.subtitle = [NSString stringWithFormat:@"The mod is made for %@", versions];
             wrong.message = [NSString stringWithFormat:
                 @"Sigma is made for Spotify %@ (%@ is the one it is built on). On any other version parts of it "
                 @"break or go missing, so it won't work the way you expect.\n\n%@ Use a %@ IPA instead.",
-                list, SGSupportedSpotifyVersion, kReportLine, SGSupportedSpotifyVersion];
+                versions, SGSupportedSpotifyVersion, kReportLine, SGSupportedSpotifyVersion];
             wrong.key = @"spotifyglass.spotifyversion.warned";
             wrong.stamp = version;
             [list addObject:wrong];
