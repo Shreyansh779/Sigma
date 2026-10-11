@@ -1153,7 +1153,8 @@ typedef struct {
     if (_plain) return;   // a line with no time has nowhere to seek to
     for (SGRKaraokeLineView *view in _shown.allValues) {
         if (!CGRectContainsPoint(CGRectInset(view.frame, -_margin, -_lineGap / 2), point)) continue;
-        SGKaraokeSeek(view.line.start);
+        // The line shows Delay later than the song, so its sound is that much past its start.
+        SGKaraokeSeek(view.line.start + SGKaraokeDelayMs());
         SGPlayFeedback(SGFeedbackSkip);
         [self followSong];
         return;
@@ -1200,6 +1201,14 @@ typedef struct {
     [NSObject cancelPreviousPerformRequestsWithTarget:self selector:@selector(followSong) object:nil];
     _browsing = YES;
     for (SGRKaraokeLineView *view in _shown.allValues) view.blur = 0;
+    if (self.browsingBegan) self.browsingBegan();
+}
+
+// Alpha, not hidden: the button keeps its place in the layout, and goes out of reach of touches with it.
+- (void)setExtrasHidden:(BOOL)hidden {
+    _extrasHidden = hidden;
+    _extras.alpha = hidden ? 0 : 1;
+    _extras.userInteractionEnabled = !hidden;
 }
 
 - (void)scrollViewDidScroll:(UIScrollView *)scrollView {
@@ -1505,6 +1514,7 @@ typedef struct {
     }
     _extras.menu = [UIMenu menuWithChildren:items];
     _extras.hidden = NO;
+    self.extrasHidden = _extrasHidden;
     [self setNeedsLayout];
 }
 
@@ -1704,6 +1714,8 @@ typedef struct {
 // corrections. A seek or a new track is too far off to ease and is taken at once.
 - (double)clockMs {
     NSInteger raw = SGKaraokePositionMs();
+    // The Lyrics page's Delay: below 0 for the first moments of a song with one.
+    if (raw >= 0) raw -= SGKaraokeDelayMs();
     CFTimeInterval shown = _link.targetTimestamp;
     BOOL running = raw != _reported;   // a paused player reports the same position every frame
     if (running) _stillSince = 0;

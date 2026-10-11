@@ -9,3 +9,4 @@ extern const SGFlagDef SGFlagTable[];
 extern const NSUInteger SGFlagCount;
 
 UIViewController *SGAllFlagsPage(void);
+UIViewController *SGLabsPage(void);
