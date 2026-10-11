@@ -10,5 +10,7 @@ NSArray<SGModSection *> *SGRNowPlayingSections(void) {
         SGSection(nil, @[
             SGHideRow(@"Hide the device button", nil, SGRHideBarConnect),
         ]),
+        SGNotedSection(@"Controls", @[SGSwitchRow(@"Volume", nil, SGRKeyPlayerVolume)],
+                       @"Volume puts a slider under the controls for this iPhone, or the speaker's while Spotify plays on another device."),
     ] arrayByAddingObjectsFromArray:SGRPlayerBackgroundSections()];
 }

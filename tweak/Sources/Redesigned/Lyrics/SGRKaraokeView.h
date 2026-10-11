@@ -21,4 +21,8 @@
 // Asked as a tap lands on the lines, before it seeks or opens what a line means; NO leaves the tap to
 // whoever else watches the touch. Nil takes every tap.
 @property (nonatomic, copy) BOOL (^takesTap)(void);
+// Called as a finger starts to scroll the lines, for a host that hides its controls then.
+@property (nonatomic, copy) void (^browsingBegan)(void);
+// The pronunciation and translation button goes with the host's controls when they are hidden.
+@property (nonatomic) BOOL extrasHidden;
 @end

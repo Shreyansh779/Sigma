@@ -102,6 +102,25 @@ void SGRPlayerSetCoverHidden(BOOL hidden);
 // Every cover in the list going or coming back over `duration`, as SGRPlayerAnimatedShowing now says.
 void SGRPlayerCoversFollowClip(NSTimeInterval duration);
 
+#pragma mark - landscape lyrics (PlayerLandscape.x)
+
+// The lyrics turn sideways with the phone onto a landscape screen of their own. On until switched off.
+// Shown or put away by hand for the harness.
+#define SGRKeyLyricsLandscape @"spotifyglass.redesign.lyrics.landscape"
+void SGRPlayerShowLandscape(BOOL show);
+
+#pragma mark - the volume (PlayerVolume.m)
+
+// A volume slider under the controls, the system's: this iPhone's, or the Connect device's. On until
+// switched off, read at launch. Placed by the footer's layout, between the controls (`controls`) and the
+// footer row (`row`), both arranged in Spotify's bottom stack, `margin` in from each side.
+#define SGRKeyPlayerVolume @"spotifyglass.redesign.player.volume"
+BOOL SGRPlayerVolumeOn(void);
+// YES when the row shows; NO when it is off, has no controls to sit under or no room between them and the footer.
+BOOL SGRPlayerPlaceVolume(UIView *stack, UIView *controls, UIView *row, CGFloat margin);
+// Whether `view` is that row, which the footer's layout must not take for Spotify's controls.
+BOOL SGRPlayerIsVolumeRow(UIView *view);
+
 #pragma mark - the lyrics in the player (PlayerLyrics.x)
 
 // Whether the playing track has lyrics the player can show.

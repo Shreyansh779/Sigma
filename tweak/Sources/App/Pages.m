@@ -14,6 +14,9 @@
 #import "Redesigned/Navbar/Navbar.h"
 #import "Redesigned/NowPlayingBar/NowPlayingBar.h"
 #import "Redesigned/Kit/SGRAccent.h"
+#import "Redesigned/Player/Player.h"
+#import "Redesigned/Home/Home.h"
+#import "Shared/Fonts/Fonts.h"
 
 NSString *const SGRedesignedUIInfo = @"The newest version of Sigma, leaning towards Apple Music's style. It is not compatible with the legacy look's settings.\n\nThe legacy look gives you more freedom, yet still looks like Spotify.";
 
@@ -49,6 +52,9 @@ SGModSection *SGAppearanceSection(void) {
     };
     NSMutableArray<SGModRow *> *rows = [NSMutableArray arrayWithObject:SGWithSymbol(redesign, @"sparkles")];
     [rows addObjectsFromArray:SGRedesignedUIStored() ? SGRAppearanceRows() : SGNativeAppearanceRows()];
+    if (SGRedesignedUIStored()) [rows addObject:SGRHomeTopPicksRow()];
+    // One font for the whole app, under either look.
+    [rows addObjectsFromArray:SGAppFontRows()];
     return SGNotedSection(@"Appearance", rows, @"Changes apply after you restart Spotify.");
 }
 
@@ -62,8 +68,11 @@ UIViewController *SGLyricsSettingsPage(void) {
     NSMutableArray<SGModRow *> *more = [NSMutableArray arrayWithObject:SGLockScreenLyricsRow()];
     if (!redesigned) [more insertObject:SGGlassLyricsRow() atIndex:0];
     NSMutableArray<SGModSection *> *sections = [NSMutableArray arrayWithObject:SGLyricsSourcesSection(redesigned)];
+    [sections addObject:SGNotedSection(@"Timing", @[SGLyricsDelayRow()],
+        @"Every line shows this much later than the song, for Bluetooth headphones that play a little behind the lyrics. Applies at once.")];
     if (redesigned) {
-        [sections addObject:SGSection(@"Display", @[SGLyricsWordTimingRow(), SGRLyricsTextSizesRow(), SGLyricsTranslationLanguageRow(), SGLyricsMeaningsRow()])];
+        [sections addObject:SGSection(@"Display", @[SGLyricsWordTimingRow(), SGRLyricsTextSizesRow(), SGLyricsTranslationLanguageRow(), SGLyricsMeaningsRow(),
+            SGSwitchRow(@"Landscape lyrics", @"Turn the phone with the lyrics open", SGRKeyLyricsLandscape)])];
     }
     [sections addObject:SGSection(nil, more)];
     return [[SGModPage alloc] initWithTitle:@"Lyrics" intro:SGRestartNote sections:sections footer:nil];
