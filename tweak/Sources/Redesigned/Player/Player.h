@@ -51,9 +51,6 @@ typedef NS_ENUM(NSInteger, SGRPlayerBackground) {
 SGRPlayerBackground SGRPlayerBackgroundStyle(void);
 // Posted when the choice changes, so the player follows without a restart.
 extern NSNotificationName const SGRPlayerBackgroundDidChangeNotification;
-// Animated artwork's sources in the order they are asked (Shared/LockScreenArtwork's, apart from the
-// lock screen's own order): Spotify, then Apple Music until set.
-#define SGRKeyPlayerArtworkSources @"spotifyglass.redesign.player.artworksources"
 // Fluid artwork's sliders, whole numbers: speed, warp, saturation and brightness in percent, blur in passes.
 #define SGRKeyFluidSpeed @"spotifyglass.redesign.player.fluid.speed"
 #define SGRKeyFluidWarp @"spotifyglass.redesign.player.fluid.warp"

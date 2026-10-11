@@ -37,7 +37,6 @@ static const NSTimeInterval kPickGrace = 0.3;
 static const NSTimeInterval kSettle = 0.8;
 // The rows of the last menu, for the next one to open on.
 static NSString *const kLastRowsKey = @"spotifyglass.redesign.player.menuRows";
-static const CGFloat kPanelWidth = 300, kPanelTop = 12;
 
 // Whether the hooks are in, so the ⋯ is watched only when a menu can be taken over.
 static BOOL sgr_menuOn;
@@ -372,52 +371,6 @@ static SGRPlayerMenuAnchor *anchorIn(UIView *button) {
     return anchor;
 }
 
-#pragma mark - Speed and pitch's panel
-
-// The sliders in a popover from the ⋯: a system menu has no room for a view of its own.
-@interface SGRSpeedPitchPanel : UIViewController <UIPopoverPresentationControllerDelegate>
-@end
-
-@implementation SGRSpeedPitchPanel {
-    UIView *_panel;
-    id _observer;
-}
-
-- (void)dealloc {
-    if (_observer) [NSNotificationCenter.defaultCenter removeObserver:_observer];
-}
-
-- (void)viewDidLoad {
-    [super viewDidLoad];
-    self.overrideUserInterfaceStyle = UIUserInterfaceStyleDark;
-    _panel = SGSpeedPitchPanelMake();
-    [self.view addSubview:_panel];
-    [self fit];
-    __weak SGRSpeedPitchPanel *weak = self;
-    // Pitch following speed folds its slider away, and the panel with it.
-    _observer = [NSNotificationCenter.defaultCenter addObserverForName:SGSpeedPitchChangedNotification object:nil
-                                                                queue:NSOperationQueue.mainQueue usingBlock:^(NSNotification *note) {
-        [weak fit];
-        [weak.view setNeedsLayout];
-    }];
-}
-
-- (void)fit {
-    CGSize size = CGSizeMake(kPanelWidth, kPanelTop + SGSpeedPitchPanelHeight());
-    if (!CGSizeEqualToSize(self.preferredContentSize, size)) self.preferredContentSize = size;
-}
-
-- (void)viewDidLayoutSubviews {
-    [super viewDidLayoutSubviews];
-    CGRect safe = UIEdgeInsetsInsetRect(self.view.bounds, self.view.safeAreaInsets);
-    _panel.frame = CGRectMake(CGRectGetMinX(safe), CGRectGetMinY(safe) + kPanelTop, safe.size.width, SGSpeedPitchPanelHeight());
-}
-
-- (UIModalPresentationStyle)adaptivePresentationStyleForPresentationController:(UIPresentationController *)controller traitCollection:(UITraitCollection *)traits {
-    return UIModalPresentationNone;
-}
-@end
-
 #pragma mark - the takeover of one sheet
 
 @interface SGRPlayerMenuTakeover : NSObject
@@ -662,20 +615,24 @@ static void menuClosed(SGRPlayerMenuTakeover *t) {
     });
 }
 
+// The sliders in a popover from the ⋯ (Shared/Player/SpeedPitchMenu.x): a system menu has no room for a view
+// of its own.
 static void openSpeedPitch(SGRPlayerMenuTakeover *t) {
     UIView *button = t.button;
-    UIViewController *player = t.player;
     finish(t, @"Speed and pitch opens its panel", ^{
-        if (!player || !button.window || player.presentedViewController) return;
-        SGRSpeedPitchPanel *panel = [SGRSpeedPitchPanel new];
-        panel.modalPresentationStyle = UIModalPresentationPopover;
-        UIPopoverPresentationController *popover = panel.popoverPresentationController;
-        popover.sourceView = button;
-        popover.sourceRect = button.bounds;
-        popover.permittedArrowDirections = UIPopoverArrowDirectionUp;
-        popover.delegate = panel;
-        [player presentViewController:panel animated:YES completion:nil];
+        if (!button.window) return;
+        SGPlayerShowSpeedPitchPanel(button);
     });
+}
+
+// What the row says under its title: the speed and the pitch, while either is not normal.
+static NSString *speedPitchSummary(void) {
+    NSMutableArray<NSString *> *parts = [NSMutableArray array];
+    double speed = SGPlayerSpeed();
+    if (fabs(speed - 1) > 0.005) [parts addObject:[NSString stringWithFormat:@"%gx", round(speed * 100) / 100]];
+    float pitch = SGPlayerPitch();
+    if (!SGPlayerPitchFollowsSpeed() && fabsf(pitch) > 0.05f) [parts addObject:[NSString stringWithFormat:@"%+.1f", pitch]];
+    return parts.count ? [parts componentsJoinedByString:@", "] : nil;
 }
 
 #pragma mark building the menu
@@ -704,7 +661,7 @@ static UIAction *speedAndPitchAction(SGRPlayerMenuTakeover *t) {
     UIAction *action = [UIAction actionWithTitle:@"Speed and pitch" image:symbol(@"slider.horizontal.3") identifier:nil handler:^(UIAction *sender) {
         pick(weak, ^(SGRPlayerMenuTakeover *strong) { openSpeedPitch(strong); });
     }];
-    action.subtitle = SGSpeedPitchSummary();
+    action.subtitle = speedPitchSummary();
     return action;
 }
 
@@ -912,6 +869,13 @@ static SGRPlayerMenuTakeover *takeoverFor(UIViewController *menu) {
     });
     SGLog(@"redesign player menu: the ⋯'s sheet taken over");
     return t;
+}
+
+// Shared/Player/SpeedPitch.h: whether Spotify's sheet is shown as this menu instead, unseen under it, whose own
+// items stand in for the Speed and pitch block that SpeedPitchMenu.x would put into the sheet.
+BOOL SGPlayerMenuReplaced(UIViewController *menu) {
+    SGRPlayerMenuTakeover *t = takeoverFor(menu);
+    return t && !t.revealed && !t.finished;
 }
 
 #pragma mark - what darkens the screen as the menu opens
