@@ -20,6 +20,14 @@ static long intFor(NSString *key, long lower, long upper, long orig) {
     return value ? MAX(lower, MIN(upper, (long)[value longLongValue])) : orig;
 }
 
+// 9.1.88's switch over the system's own glass (default, force_enabled, force_disabled). Default leaves it
+// to Info.plist, where the IPA build turns glass on; a force_disabled from Spotify's servers would take
+// the glass off the redesign's bars. 9.1.90's own Liquid Glass tab bar is off by default, and both looks
+// build on the tab bar as it is, so a server turning it on would pull them apart. Both pinned in both
+// looks, after an override from the All flags page; neither key exists in 9.1.78, so nothing asks.
+static NSString *const kGlassOverride = @"ios-reprise-liquid-glass-override.mode";
+static NSString *const kGlassTabBar = @"ios-navigationui-tabbar-impl.is_liquid_glass_tab_bar_enabled";
+
 static id enumFor(NSString *key, id orig) {
     id value = forced(key);
     return [value isKindOfClass:NSString.class] ? value : orig;
@@ -57,6 +65,10 @@ static id enumFor(NSString *key, id orig) {
 %end
 
 %ctor {
+    SGRegisterFlagForcer(NO, ^id(NSString *key) {
+        if ([key isEqualToString:kGlassOverride]) return @"default";
+        return [key isEqualToString:kGlassTabBar] ? @NO : nil;
+    }, nil);
     %init;
     SGRequireClasses(@[
         @"_TtC22RemoteConfigurationSDK25ConfigurationProviderImpl",

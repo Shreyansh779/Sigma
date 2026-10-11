@@ -64,9 +64,11 @@ Rules:
   release PR tags `vX.Y.Z` and attaches the `.deb`. Never edit `version.txt` by hand. `beta` releases
   `vX.Y.Z-beta.N` pre-releases the same way (`release-please-config.beta.json`); only beta builds are
   offered them. When `beta` merges into `main`, keep `main`'s `version.txt`.
-- Moving to a new Spotify version: change `SGSupportedSpotifyVersion` in `Settings/SGPageStyle.m`. Any
-  other version gets the "isn't supported" alert and red row (`App/About/Compatibility.m`), so a bump
-  without it warns everyone. Update the README (badge and text), `.github/ISSUE_TEMPLATE/bug_report.yml`,
+- Moving to a new Spotify version: `SGSupportedSpotifyVersion` in `Settings/SGPageStyle.m` is the one the
+  mod is made for (9.1.78); `SGSupportedSpotifyVersions()` adds what it is checked on (9.1.88) and
+  `SGLikelyWorksSpotifyVersions()` what ran cleanly in a short test (9.1.90). A version in none of them gets
+  the "isn't supported" alert and red row (`App/About/Compatibility.m`), so a bump without it warns
+  everyone. Update the README (badge and text), `.github/ISSUE_TEMPLATE/bug_report.yml`,
   the iOS floor above and the web's `content/site.ts` with it. `Shared/Audio/SGAudioSourceQueue.m` pins
   the 9.1.78 binary by UUID and offsets and stands down on any other until they are read off again.
 - Known traps: anything pushed onto Spotify's nav stack must conform to `SPTPageController`
