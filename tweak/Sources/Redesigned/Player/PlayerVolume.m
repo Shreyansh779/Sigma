@@ -90,6 +90,10 @@ static UIImageView *glyph(NSString *symbol) {
 
 static char kVolumeKey, kPlayKey;
 
+BOOL SGRPlayerIsVolumeRow(UIView *view) {
+    return [view isKindOfClass:SGRVolumeRow.class];
+}
+
 // Read at launch, as the player's other switches are: the footer asks on every layout pass.
 BOOL SGRPlayerVolumeOn(void) {
     static BOOL on;
