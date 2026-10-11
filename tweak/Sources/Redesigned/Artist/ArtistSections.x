@@ -192,6 +192,7 @@ static void logOnce(NSString *what) {
         // What the cell paints over the field -- the "You liked" row, every carousel's collection and the
         // fade Popular's "See more" draws over its last track (device, trees/continuous/3.txt 2026-09-18).
         SGRClearCellPaint(cell);
+        clearLikedBadge(cell);
         // The first of Popular's tracks with its title in is the list the page waits for (Kit/SGRReveal.h); a
         // row still loading is RetrievalRowLoadingElementUI, grey bars with empty labels.
         if (SGRRevealWaitsFor(page, SGRRevealList)) {
