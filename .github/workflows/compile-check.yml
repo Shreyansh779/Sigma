@@ -1,8 +1,11 @@
 name: Compile check
 
 # Builds the tweak alone, keeping going after an error so one run lists every file that fails.
-# No IPA is injected: the flag table needs the IPA once and is cached after that.
+# No IPA is injected: the flag table needs the IPA once and is cached after that. Runs on every push to the
+# port's branch; delete this file with the branch.
 on:
+  push:
+    branches: [feat/vitrine-port]
   workflow_dispatch:
     inputs:
       ipa_url:
