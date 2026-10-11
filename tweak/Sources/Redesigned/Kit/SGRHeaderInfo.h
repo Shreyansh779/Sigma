@@ -31,6 +31,9 @@ extern const CGFloat SGRHeaderInfoTitleRise;  // 56, of the content over the pic
 // the Encore facepile under `row` and drawn before the line, the two centred as one and tapped as one. Only
 // faces with a picture, at most three; none leaves the name alone with no gap. nil clears them.
 - (void)showFacesIn:(UIView *)row;
+// The title as a picture (an artist's logo from Apple Music) in the title's place, crossing over with the word,
+// the block making room for it; nil brings the word back.
+- (void)showTitleImage:(UIImage *)image;
 // For a trailing control that shows its state only as a word (the artist's Follow): SGRMirrorButton's
 // readState and its two symbols. Set before the first -showShuffle:...; -trailingStateChanged redraws it.
 @property (nonatomic, copy) BOOL (^trailingState)(BOOL *on);

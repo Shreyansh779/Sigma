@@ -28,10 +28,29 @@
 // (SGRPinnedMore) draws and fires it from the top trailing corner of the page, level with the back button.
 #import "Core/SGCore.h"
 #import "Redesigned/Kit/SGRKit.h"
+#import "Shared/AnimatedArtwork/AnimatedArtwork.h"
+#import "Redesigned/Album/Album.h"
 #import "Artist.h"
 
 // How much of the photo's height the dissolve into the field covers, and the scrim over the top of it that
 // keeps the status bar and the back button legible on a bright picture. The playlist's and the album's.
+static char kLogoNameKey;
+
+// Apple Music's logo for the artist in place of the name, where Apple Music has one. Asked once per name;
+// the catalog remembers the answer for the launch.
+static void showLogo(SGRHeaderInfo *info, NSString *name) {
+    if (!name.length || !SGEnabled(SGRKeyArtistLogo) || [objc_getAssociatedObject(info, &kLogoNameKey) isEqualToString:name]) return;
+    objc_setAssociatedObject(info, &kLogoNameKey, name, OBJC_ASSOCIATION_COPY_NONATOMIC);
+    __weak SGRHeaderInfo *weakInfo = info;
+    CGFloat pixels = UIScreen.mainScreen.bounds.size.width * UIScreen.mainScreen.scale;
+    SGMotionArtistLogo(name, pixels, ^(UIImage *logo) {
+        SGRHeaderInfo *shown = weakInfo;
+        if (!shown || ![objc_getAssociatedObject(shown, &kLogoNameKey) isEqualToString:name]) return;
+        [shown showTitleImage:logo];
+        if (logo) SGLog(@"redesign artist: Apple Music's logo for %@", name);
+    });
+}
+
 static const CGFloat kDissolve = 0.46, kTopScrim = 140, kTopScrimAlpha = 0.28;
 // A photo view narrower than this is a placeholder glyph, and a picture shorter than this one mid load.
 static const CGFloat kMinCover = 80, kMinHero = 120;
@@ -278,6 +297,7 @@ static void applyHeader(UIView *header) {
     UIView *listeners = SGRFindByIdentifier(header, @"Components.Header.UI.Metadata", &kMetaKey);
     NSString *name = firstText(title) ?: firstText(bar), *listening = firstText(listeners);
     [info showTitle:name creator:nil length:listening about:nil];
+    showLogo(info, name);
 
     UIView *shuffle = SGRFindByIdentifier(header, @"Components.UI.ShuffleButton", &kShuffleKey);
     UIView *play = SGRFindByIdentifier(header, @"header-play-button", &kPlayKey);

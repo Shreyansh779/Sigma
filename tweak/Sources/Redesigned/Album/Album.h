@@ -21,9 +21,10 @@
 // Threading: main thread only.
 #import <UIKit/UIKit.h>
 
-// Apple Music's animated cover at the top of an album (AlbumHeader.x); on until switched off.
-#define SGRKeyAnimatedCovers @"spotifyglass.redesign.animatedcovers"
-
+// Apple Music's animated cover at the top of an album, and its logo in place of an artist's name; both on
+// until switched off (AlbumSettings.m).
+#define SGRKeyAlbumMotion @"spotifyglass.redesign.album.motion"
+#define SGRKeyArtistLogo @"spotifyglass.redesign.artist.logo"
 UIViewController *SGRAlbumSettingsPage(void);
 
 // The album page `view` is on, or nil: the CreativeWorkTemplateView that carries the header, the list and
@@ -38,3 +39,24 @@ UIView *SGRAlbumPageOf(UIView *view);
 UIColor *SGRAlbumFieldColor(UIView *view);
 // The cover of the page `view` is on, for its field to take its colour from. The same image again is a no-op.
 void SGRAlbumSetArtwork(UIView *view, UIImage *image);
+
+// AlbumSections.x. The sections under the tracks, one switch each, all dropped until switched off; the last
+// is every section none of the others names.
+#define SGRKeyAlbumHideMoreBy @"spotifyglass.redesign.album.hide.moreBy"
+#define SGRKeyAlbumHideVideos @"spotifyglass.redesign.album.hide.videos"
+#define SGRKeyAlbumHideConcerts @"spotifyglass.redesign.album.hide.concerts"
+#define SGRKeyAlbumHideMerch @"spotifyglass.redesign.album.hide.merch"
+#define SGRKeyAlbumHideYouMightLike @"spotifyglass.redesign.album.hide.youMightLike"
+#define SGRKeyAlbumHideOther @"spotifyglass.redesign.album.hide.other"
+
+// AlbumRows.x. A track row's artist line goes when it only repeats the album's artist, with the explicit badge
+// moved up beside the title; on until switched off (AlbumSettings.m).
+#define SGRKeyAlbumHideTrackArtists @"spotifyglass.redesign.album.hide.trackArtists"
+// The album's artist as the header of the page `view` is on shows it, for the rows to compare theirs with. A
+// change lays the page's track rows out again; the same artist again is a no-op.
+void SGRAlbumSetArtist(UIView *view, NSString *artist);
+// AlbumCredits.m. Whether a row's artist line says nothing the album's header does not: it is the album's
+// artist, or the album's artist and the guests the title names after "feat.", "ft.", "featuring" or "with".
+BOOL SGRCreditRepeatsAlbum(NSString *albumArtist, NSString *rowArtist, NSString *title);
+// What the Albums page stored before it held Apple Music's covers and logos among other things.
+#define SGRKeyAnimatedCoversWas @"spotifyglass.redesign.animatedcovers"

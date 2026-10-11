@@ -205,7 +205,7 @@ static char kReadyContext;
 }
 
 - (void)findMotionOf:(NSString *)album by:(NSString *)artist {
-    if (!album.length || !artist.length || !SGFlag(SGRKeyAnimatedCovers, YES)) return;
+    if (!album.length || !artist.length || !SGEnabled(SGRKeyAlbumMotion) && SGMotionAppleMusicOn()) return;
     // Not even looked up while it could not move: the clip is megabytes.
     if (SGRReduceMotion() || NSProcessInfo.processInfo.lowPowerModeEnabled) return;
     NSString *wanted = [NSString stringWithFormat:@"%@\n%@", artist, album];
@@ -406,6 +406,8 @@ static SGRHeaderInfo *applyInfo(UIView *header, UIView *page) {
     NSString *name = firstText(title), *length = metadataText(metadata);
     NSString *artist = firstText(parent) ?: trimmed(parent.accessibilityLabel);
     [info showTitle:name creator:artist length:length about:nil];
+    // The line as it reads, without the accessibility label to fall back on: no line, no row loses its artist.
+    SGRAlbumSetArtist(page, firstText(parent));
     [(SGRAlbumHero *)objc_getAssociatedObject(header, &kHeroKey) findMotionOf:name by:artist];
     // The kind and the date are cells the metadata row's collection view makes on its own pass, after the
     // header's, and nothing lays the header out again when they arrive; the collection is Spotify's own Swift
@@ -541,6 +543,7 @@ static void applyPage(UIView *page) {
 
 %ctor {
     if (!SGRedesignedUI()) return;
+    SGMigrateKey(SGRKeyAnimatedCoversWas, SGRKeyAlbumMotion);
     %init;
     SGRequireClasses(@[
         @"_TtC28CreativeWorkPlatform_PageKit24CreativeWorkTemplateView",
