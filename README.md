@@ -100,6 +100,10 @@ Parts of Sigma come from [Vitrine](https://github.com/My-Name-Is-Jeff/vitrine) b
 the volume slider, the landscape player, Home's Top picks, custom fonts, clean links and the What's new
 page.
 
+The Sing voice model is Mel-Band RoFormer (Ju-Chiang Wang, Wei-Tsung Lu, Minz Won) with
+KimberleyJensen's vocal checkpoint (MIT), exported for the Neural Engine by Vitrine and downloaded from
+[its Hugging Face repo](https://huggingface.co/My-Name-Is-Jeff/vitrine-sing).
+
 ## License
 
 GPL-3.0, see [LICENSE](LICENSE). Not affiliated with Spotify.
