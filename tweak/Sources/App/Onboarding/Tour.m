@@ -25,7 +25,7 @@ static char kPaneKey;
 }
 @end
 
-static UIButton *glassButton(NSString *title) {
+UIButton *SGOnboardingButton(NSString *title) {
     UIButtonConfiguration *config;
     if (@available(iOS 26.0, *)) config = [UIButtonConfiguration prominentGlassButtonConfiguration];
     else config = [UIButtonConfiguration filledButtonConfiguration];
@@ -224,7 +224,7 @@ static UIButton *glassButton(NSString *title) {
     [scroll addSubview:column];
     [self.view addSubview:scroll];
 
-    _primary = glassButton(@"Start listening");
+    _primary = SGOnboardingButton(@"Start listening");
     [_primary addTarget:self action:@selector(finish) forControlEvents:UIControlEventTouchUpInside];
     UILabel *footer = [UILabel new];
     footer.text = @"Hold Home to open settings.";
@@ -313,7 +313,7 @@ static UIButton *glassButton(NSString *title) {
 static __weak SGOnboardingController *sg_tour;
 
 BOOL SGOnboardingShowing(void) {
-    return sg_tour != nil;
+    return sg_tour != nil || SGWhatsNewShowing();
 }
 
 void SGShowOnboarding(void) {
