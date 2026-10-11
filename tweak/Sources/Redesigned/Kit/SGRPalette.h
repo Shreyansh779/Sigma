@@ -14,12 +14,18 @@ typedef struct {
     // A blurred copy at the artwork's own aspect, transparent down to 55% of its height and opaque
     // from 85%, to lay over the sharp picture with the same aspect fill.
     BOOL dissolve;
+    // The colours of a moving background (flowColors below): the artwork's main colour in each quarter and overall.
+    BOOL flow;
 } SGRPaletteRequest;
 
 @interface SGRPalette : NSObject
 @property (nonatomic, readonly) UIColor *edgeColor;
 @property (nonatomic, readonly) UIColor *fieldColor;
 @property (nonatomic, readonly) UIImage *dissolve;   // nil unless asked for, 96px wide
+// nil unless asked for: top left, top right, bottom left, bottom right, then the whole artwork's, each the
+// dominant colour there, its saturation lifted a little and its luminance held between 0.03 and 0.13, so white
+// text keeps better than 5.5:1 on any of them.
+@property (nonatomic, readonly) NSArray<UIColor *> *flowColors;
 // nil to the completion when the image has no bitmap to read (a symbol, a CIImage).
 + (void)paletteForImage:(UIImage *)image request:(SGRPaletteRequest)request completion:(void (^)(SGRPalette *palette))completion;
 
