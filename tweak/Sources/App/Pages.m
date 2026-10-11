@@ -18,6 +18,7 @@
 #import "Redesigned/Player/Player.h"
 #import "Redesigned/Home/Home.h"
 #import "Shared/Fonts/Fonts.h"
+#import "Shared/Gestures/Gestures.h"
 
 NSString *const SGRedesignedUIInfo = @"The newest version of Sigma, leaning towards Apple Music's style. It is not compatible with the legacy look's settings.\n\nThe legacy look gives you more freedom, yet still looks like Spotify.";
 
@@ -88,6 +89,8 @@ UIViewController *SGPlayerSettingsPage(void) {
         [pages addObject:SGWithSymbol(SGPageRow(@"Now playing bar", ^UIViewController *{ return SGNowPlayingBarSettingsPage(); }), @"rectangle.bottomthird.inset.filled")];
         [pages addObject:SGWithSymbol(SGPageRow(@"Queue & devices", ^UIViewController *{ return SGQueueSettingsPage(); }), @"text.line.first.and.arrowtriangle.forward")];
     }
+    // Double taps over the artwork, under either look.
+    [pages addObject:SGWithSymbol(SGPageRow(@"Gestures", ^UIViewController *{ return SGGesturesSettingsPage(); }), @"hand.tap")];
     [pages addObject:SGWithSymbol(SGPageRow(@"Lock screen widget", ^UIViewController *{ return SGLockScreenWidgetPage(); }), @"lock")];
     [sections addObject:SGSection(nil, pages)];
     [sections addObjectsFromArray:native ? SGNativePlayerScreenSections() : SGRNowPlayingSections()];

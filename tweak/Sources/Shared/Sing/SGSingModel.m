@@ -62,8 +62,24 @@ static long long totalBytes(void) {
 }
 
 static NSURL *singFolder(void) {
-    NSURL *support = [NSFileManager.defaultManager URLsForDirectory:NSApplicationSupportDirectory inDomains:NSUserDomainMask].firstObject;
-    return [[support URLByAppendingPathComponent:@"Sigma" isDirectory:YES] URLByAppendingPathComponent:@"Sing" isDirectory:YES];
+    static NSURL *folder;
+    static dispatch_once_t once;
+    dispatch_once(&once, ^{
+        NSFileManager *files = NSFileManager.defaultManager;
+        NSURL *support = [files URLsForDirectory:NSApplicationSupportDirectory inDomains:NSUserDomainMask].firstObject;
+        NSURL *made = [[support URLByAppendingPathComponent:@"Sigma" isDirectory:YES] URLByAppendingPathComponent:@"Sing" isDirectory:YES];
+        // The folder was spoti.pw/Sing before the project was renamed: a model already downloaded moves across
+        // instead of being fetched again, or goes if Sigma/Sing was made first.
+        NSURL *earlier = [[support URLByAppendingPathComponent:@"spoti.pw" isDirectory:YES] URLByAppendingPathComponent:@"Sing" isDirectory:YES];
+        if ([files fileExistsAtPath:earlier.path] && ![files fileExistsAtPath:made.path]) {
+            [files createDirectoryAtURL:made.URLByDeletingLastPathComponent withIntermediateDirectories:YES attributes:nil error:nil];
+            [files moveItemAtURL:earlier toURL:made error:nil];
+        } else if ([files fileExistsAtPath:earlier.path]) {
+            dispatch_async(dispatch_get_global_queue(QOS_CLASS_UTILITY, 0), ^{ [files removeItemAtURL:earlier error:nil]; });
+        }
+        folder = made;
+    });
+    return folder;
 }
 
 static NSURL *modelFolder(void) {
@@ -497,6 +513,29 @@ void SGSingRemoveOldModel(void) {
               ? @"sing: the old voice model (separator.mlmodelc) is kept until separator-ane.mlmodelc is downloaded, and Karaoke runs on it, on the CPU alone"
               : @"sing: the old voice model (separator.mlmodelc) is kept until separator-ane.mlmodelc is downloaded; the dev copy is in use");
     }
+}
+
+BOOL SGSingOldModelPresent(void) {
+    return [NSFileManager.defaultManager fileExistsAtPath:oldFolder().path];
+}
+
+NSString *SGSingOldModelSizeText(void) {
+    long long total = 0;
+    for (size_t i = 0; i < sizeof kOldFiles / sizeof kOldFiles[0]; i++) total += kOldFiles[i].size;
+    return [NSByteCountFormatter stringFromByteCount:total countStyle:NSByteCountFormatterCountStyleFile];
+}
+
+void SGSingDeleteOldModel(void) {
+    // A download of the old model that was stopped has nothing to resume now.
+    BOOL downloadingNew = sg_downloader != nil;
+    long long freed = 0;
+    NSMutableArray<NSURL *> *old = [NSMutableArray arrayWithObject:oldFolder()];
+    if (!downloadingNew) [old addObject:[singFolder() URLByAppendingPathComponent:@"download"]];
+    removeAll(old, &freed);
+    sg_modelGeneration++;
+    SGLog(@"sing: the old voice model (separator.mlmodelc) is deleted from the settings, %@ freed",
+          [NSByteCountFormatter stringFromByteCount:freed countStyle:NSByteCountFormatterCountStyleFile]);
+    announce();
 }
 
 BOOL SGSingModelUpdateAvailable(void) {

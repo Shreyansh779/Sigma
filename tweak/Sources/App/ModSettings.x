@@ -19,6 +19,8 @@
 #import "Native/Home/Home.h"
 #import "Redesigned/Album/Album.h"
 #import "Shared/Sing/Sing.h"
+#import "Shared/HeadGestures/HeadGestures.h"
+#import "Shared/LiveActivity/LiveActivity.h"
 #import "Shared/AudioEffects/AudioEffectsPage.h"
 #import "Shared/Privacy/Privacy.h"
 #import "Shared/Flags/Flags.h"
@@ -60,7 +62,14 @@ static UIViewController *modSettingsPage(void) {
     spatial.visible = ^BOOL { return SGSingSpatialAvailable(); };
     SGModRow *audioEffects = pageRow(@"Audio effects", @"slider.vertical.3", ^UIViewController *{ return SGDSPSettingsPage(); });
     audioEffects.value = ^NSString *{ return SGDSPSummary(); };
-    [sections addObject:SGSection(nil, @[karaoke, spatial, audioEffects])];
+    // AirPods gestures read the head motion Spatial voice reads, and act under either look.
+    SGModRow *airpods = pageRow(@"AirPods gestures", @"airpods.pro", ^UIViewController *{ return SGHeadGesturesSettingsPage(); });
+    NSMutableArray<SGModRow *> *features = [NSMutableArray arrayWithObjects:karaoke, spatial, audioEffects, airpods, nil];
+    // The Live Activity works under both looks, where ActivityKit's card does.
+    if (@available(iOS 17.0, *)) {
+        [features addObject:pageRow(@"Live Activity", @"platter.filled.top.iphone", ^UIViewController *{ return SGLiveActivitySettingsPage(); })];
+    }
+    [sections addObject:SGSection(nil, features)];
     [sections addObjectsFromArray:@[
         SGSection(nil, parts),
         SGSection(nil, @[

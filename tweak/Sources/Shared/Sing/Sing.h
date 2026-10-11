@@ -171,6 +171,12 @@ NSString *SGSingModelInUseSizeText(void);
 // Deletes what the old model's download left, and the old model (separator.mlmodelc) itself once separator-ane.mlmodelc
 // is in, logging the space freed; from any thread, at launch and as the download ends.
 void SGSingRemoveOldModel(void);
+// The old model (separator.mlmodelc, from before Sigma moved to the Neural Engine one) is on the iPhone, and the
+// row that deletes it by hand: it frees SGSingOldModelSizeText(). Karaoke has no model afterwards until
+// separator-ane.mlmodelc is downloaded, if that is not in yet. Main thread.
+BOOL SGSingOldModelPresent(void);
+NSString *SGSingOldModelSizeText(void);
+void SGSingDeleteOldModel(void);
 NSArray<NSString *> *SGSingComputeUnitNames(void);
 // Whether this OS can load the model (iOS 18). Memory is checked as the model loads (SGSingLoader.m).
 BOOL SGSingOSSupported(void);
