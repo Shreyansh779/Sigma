@@ -1255,6 +1255,8 @@ static void readHeat(void) {
 %end
 
 %ctor {
+    // Karaoke's switch was the redesign's own, spotifyglass.redesign.sing, before it worked under both looks.
+    SGMigrateKey(@"spotifyglass.redesign.sing", SGKeySing);
     sg_outputReachable = SGPlayerWatchMusicOutput(musicOutputChanged);
     if (!sg_outputReachable) SGLog(@"sing: Spotify's output cannot be watched, Sing cannot read its format");
     SGPlayerSetStage(stage);

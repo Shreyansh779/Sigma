@@ -7,9 +7,13 @@
 
 SGLockArtwork SGLockScreenArtwork(void) {
     if (@available(iOS 26.0, *)) {
-        // The old switch's YES and NO read as Moving artwork and Off, the enum's first two.
+        // The old switch's YES and NO read as Moving artwork and Off, the enum's first two. Sigma's own switch
+        // before this came first, and moves over onto it the same way.
         static dispatch_once_t once;
-        dispatch_once(&once, ^{ SGMigrateKey(SGKeyLockScreenMotion, SGKeyLockScreenArtwork); });
+        dispatch_once(&once, ^{
+            SGMigrateKey(@"spotifyglass.lockscreen.animatedartwork", SGKeyLockScreenMotion);
+            SGMigrateKey(SGKeyLockScreenMotion, SGKeyLockScreenArtwork);
+        });
         return (SGLockArtwork)SGInt(SGKeyLockScreenArtwork, SGLockArtworkOff);
     }
     return SGLockArtworkOff;

@@ -20,7 +20,29 @@ static NSArray<SGSource *> *allSources(void) {
     ];
 }
 
+// Sigma kept an order for the lock screen and another for the player before there was one, naming the Canvas
+// "spotify": the lock screen's moves over, else the player's, and both keys go.
+static void migrateOrder(void) {
+    static dispatch_once_t once;
+    dispatch_once(&once, ^{
+        NSUserDefaults *store = NSUserDefaults.standardUserDefaults;
+        NSArray *earlier = nil;
+        for (NSString *key in @[@"spotifyglass.lockscreen.artworksources", @"spotifyglass.redesign.player.artworksources"]) {
+            if (!earlier) earlier = [store arrayForKey:key];
+            [store removeObjectForKey:key];
+        }
+        if (!earlier || [store objectForKey:SGKeyMotionSources]) return;
+        NSMutableArray *order = [NSMutableArray array];
+        for (id key in earlier) {
+            id mapped = [key isEqual:@"spotify"] ? kCanvas : key;
+            if (([mapped isEqual:kCanvas] || [mapped isEqual:kAppleMusic]) && ![order containsObject:mapped]) [order addObject:mapped];
+        }
+        [store setObject:order forKey:SGKeyMotionSources];
+    });
+}
+
 NSArray<NSString *> *SGMotionSourceOrder(void) {
+    migrateOrder();
     id stored = [NSUserDefaults.standardUserDefaults arrayForKey:SGKeyMotionSources];
     NSArray *keys = [stored isKindOfClass:NSArray.class] ? stored : @[kCanvas, kAppleMusic];
     NSMutableArray<NSString *> *order = [NSMutableArray array];

@@ -1202,6 +1202,7 @@ BOOL SGPlayerWatchMusicOutput(SGPlayerOutputWatcher watcher) {
 %end
 
 %ctor {
+    SGMigrateKey(@"spotifyglass.speedPitch.follows", SGKeyPitchFollowsSpeed);
     storeFloat(&sg_speedBits, 1);
     storeFloat(&sg_gainBits, 1);
     rebind();
