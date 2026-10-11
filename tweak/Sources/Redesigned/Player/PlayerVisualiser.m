@@ -165,7 +165,7 @@ static CAGradientLayer *fill(CAShapeLayer *shape) {
     UIImage *image = SGRNowPlayingArtwork(NULL, NULL);
     if (!image) return;
     NSUInteger generation = ++_palette;
-    SGRPaletteRequest request = {CGSizeZero, NO, YES, YES, NO};
+    SGRPaletteRequest request = {.flow = YES};
     __weak SGRVisualiserView *weakSelf = self;
     [SGRPalette paletteForImage:image request:request completion:^(SGRPalette *palette) {
         SGRVisualiserView *view = weakSelf;

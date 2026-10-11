@@ -69,8 +69,10 @@ Rules:
   `SGLikelyWorksSpotifyVersions()` what ran cleanly in a short test (9.1.90). A version in none of them gets
   the "isn't supported" alert and red row (`App/About/Compatibility.m`), so a bump without it warns
   everyone. Update the README (badge and text), `.github/ISSUE_TEMPLATE/bug_report.yml`,
-  the iOS floor above and the web's `content/site.ts` with it. The hooks on 9.1.88 and 9.1.90 were not
-  all swept against a class dump: `Redesigned/Player/PlayerMorph.x` still runs the 9.1.78 transition.
+  the iOS floor above and the web's `content/site.ts` with it. Most hooks on 9.1.88 and 9.1.90 come from
+  Vitrine, which was checked on them, but none of this tree was swept against a class dump of those two
+  yet. `Redesigned/Player/PlayerMorph.x` is Sigma's look on 9.1.78's `SPTBarOverlayPresentationTransition` and,
+  taken from Vitrine, follows 9.1.90's `CompactOverlayTransition` too (untested here).
 - Known traps: anything pushed onto Spotify's nav stack must conform to `SPTPageController`
   (`Settings/SGPage.m`). Setting `hidden` on views inside Spotify's `OverflowStackView` or its Encore
   stacks crashes, so use alpha. A `CADisplayLink` capped at 60 Hz drags the player's 120 Hz

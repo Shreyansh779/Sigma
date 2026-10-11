@@ -13,11 +13,16 @@ static const CGFloat kFadeFrom = 0.55, kDissolveOpaque = 0.85;
 // A tint: the artwork's dominant colour brought down to this luminance, then this share of it mixed into
 // the surface it tints.
 static const CGFloat kTintLuminance = 0.05, kTintShare = 0.35;
+// A moving background's colours: luminance held between these (the ceiling 0.07 with Increase Contrast), saturation
+// lifted by this much up to a cap, and a near-black one lifted by at most this factor.
+static const CGFloat kFlowLuminanceMin = 0.03, kFlowLuminanceMax = 0.13, kFlowLuminanceContrast = 0.07;
+static const CGFloat kFlowSaturationLift = 1.25, kFlowSaturationMax = 0.9, kFlowMaxLift = 4;
 
 @interface SGRPalette ()
 @property (nonatomic, readwrite) UIColor *edgeColor;
 @property (nonatomic, readwrite) UIColor *fieldColor;
 @property (nonatomic, readwrite) UIImage *dissolve;
+@property (nonatomic, readwrite) NSArray<UIColor *> *flowColors;
 @end
 
 static dispatch_queue_t paletteQueue(void) {
@@ -225,6 +230,42 @@ static BOOL dominantColorOf(CGImageRef image, CGFloat out[3]) {
     return found;
 }
 
+#pragma mark - flow
+
+// A dominant color in linear light made fit for a moving field: a little more colorful, and within
+// the luminance band that keeps white text readable on it.
+static UIColor *flowColorFor(const CGFloat linear[3], CGFloat ceiling) {
+    CGFloat r = toEncoded(linear[0]), g = toEncoded(linear[1]), b = toEncoded(linear[2]), h = 0, s = 0, v = 0, a = 1;
+    [[UIColor colorWithRed:r green:g blue:b alpha:1] getHue:&h saturation:&s brightness:&v alpha:&a];
+    [[UIColor colorWithHue:h saturation:MIN(kFlowSaturationMax, MAX(s, s * kFlowSaturationLift)) brightness:v alpha:1] getRed:&r green:&g blue:&b alpha:&a];
+    CGFloat lr = toLinear(r), lg = toLinear(g), lb = toLinear(b);
+    CGFloat luminance = 0.2126 * lr + 0.7152 * lg + 0.0722 * lb;
+    CGFloat k = 1;
+    if (luminance > ceiling) k = ceiling / luminance;
+    else if (luminance > 0 && luminance < kFlowLuminanceMin) k = MIN(kFlowMaxLift, kFlowLuminanceMin / luminance);
+    return [UIColor colorWithRed:toEncoded(MIN(1, lr * k)) green:toEncoded(MIN(1, lg * k)) blue:toEncoded(MIN(1, lb * k)) alpha:1];
+}
+
+// The artwork's main color in each quarter, then over the whole of it: the field keeps the artwork's
+// colors roughly where the artwork has them.
+static NSArray<UIColor *> *flowColorsOf(CGImageRef image, CGFloat ceiling) {
+    CGContextRef context = newBitmap(kSample, kSample);
+    if (!context) return nil;
+    CGContextSetInterpolationQuality(context, kCGInterpolationMedium);
+    CGContextDrawImage(context, CGRectMake(0, 0, kSample, kSample), image);
+    const uint8_t *px = CGBitmapContextGetData(context);
+    size_t half = kSample / 2;
+    size_t regions[5][4] = {{0, 0, half, half}, {half, 0, kSample, half}, {0, half, half, kSample}, {half, half, kSample, kSample}, {0, 0, kSample, kSample}};
+    NSMutableArray<UIColor *> *colors = [NSMutableArray arrayWithCapacity:5];
+    CGFloat linear[3];
+    for (int i = 0; i < 5; i++) {
+        if (!dominantIn(px, regions[i][0], regions[i][1], regions[i][2], regions[i][3], linear)) break;
+        [colors addObject:flowColorFor(linear, ceiling)];
+    }
+    CGContextRelease(context);
+    return colors.count == 5 ? colors : nil;
+}
+
 static UIColor *tintOf(CGImageRef image, UIColor *surface) {
     CGFloat linear[3];
     CGFloat r = 0, g = 0, b = 0, a = 1;
@@ -275,6 +316,7 @@ static UIColor *tintOf(CGImageRef image, UIColor *surface) {
             UIColor *source = dominantColorOf(cg, main)
                 ? [UIColor colorWithRed:toEncoded(main[0]) green:toEncoded(main[1]) blue:toEncoded(main[2]) alpha:1] : edge;
             palette.fieldColor = fieldColorFor(source, ceiling);
+            if (request.flow) palette.flowColors = flowColorsOf(cg, SGRIncreaseContrast() ? kFlowLuminanceContrast : kFlowLuminanceMax);
             if (request.dissolve) {
                 CGFloat aspect = (CGFloat)CGImageGetHeight(cg) / CGImageGetWidth(cg);
                 size_t height = (size_t)MIN(kDissolveWidth * 2, MAX(kDissolveWidth / 2, round(kDissolveWidth * aspect)));
