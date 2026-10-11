@@ -65,7 +65,7 @@ jobs:
         run: |
           env -u MAKELEVEL gmake -k -C tweak package 2>&1 | tee build.log || true
           echo "---- errors"
-          grep -E "error:|undefined symbol|ld: " build.log | sed -E 's/\x1b\[[0-9;]*m//g; s#^.*/tweak/##' | sort -u | tee errors.txt
+          grep -E "error:|Undefined symbols|ld: symbol" build.log | sed -E 's/\x1b\[[0-9;]*m//g; s#^.*/tweak/##' | sort -u | tee errors.txt
           [ ! -s errors.txt ]
 
       - uses: actions/upload-artifact@v5
