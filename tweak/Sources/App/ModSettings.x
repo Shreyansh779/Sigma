@@ -1,5 +1,5 @@
 // Settings: a Mod Settings row at the end of Spotify's settings list opens the mod's own page: the
-// Appearance card with Redesigned UI, Karaoke in the redesign (Sing, Redesigned/Lyrics/SingSettings.m), then a
+// Appearance card with Redesigned UI, Karaoke (Sing, Shared/Sing/SingSettings.m) and Audio effects, then a
 // page per part of Spotify, each holding what that part offers in the stored look (App/Pages.m: Navbar,
 // Player, Lyrics, Home & Library for the native look, Albums for the redesign), Privacy &
 // clutter, All flags, a searchable list of every flag with an override per flag, and Mod, the
@@ -18,8 +18,8 @@
 #import "Settings/SGModPage.h"
 #import "Native/Home/Home.h"
 #import "Redesigned/Album/Album.h"
-#import "Redesigned/Lyrics/Sing.h"
-#import "Shared/Sing/SGSingModel.h"
+#import "Shared/Sing/Sing.h"
+#import "Shared/AudioEffects/AudioEffectsPage.h"
 #import "Shared/Privacy/Privacy.h"
 #import "Shared/Flags/Flags.h"
 #import "App/About/About.h"
@@ -51,13 +51,16 @@ static UIViewController *modSettingsPage(void) {
     if (SGRedesignedUIStored()) [parts addObject:pageRow(@"Albums", @"square.stack", ^UIViewController *{ return SGRAlbumSettingsPage(); })];
     else [parts addObject:pageRow(@"Home & Library", @"house", ^UIViewController *{ return SGHomeSettingsPage(); })];
     [sections addObject:SGAppearanceSection()];
-    // Sing's microphone is the redesigned player's, so Karaoke is the redesign's; its row follows a download.
-    if (SGRedesignedUIStored()) {
-        SGModRow *karaoke = pageRow(@"Karaoke", @"music.mic", ^UIViewController *{ return SGRKaraokeSettingsPage(); });
-        karaoke.value = ^NSString *{ return SGRKaraokeSummary(); };
-        karaoke.refreshOn = SGSingModelDidChangeNotification;
-        [sections addObject:SGSection(nil, @[karaoke])];
-    }
+    // Sing and the audio effects work on the sound, so both looks have them; the row follows a download.
+    SGModRow *karaoke = pageRow(@"Karaoke", @"music.mic", ^UIViewController *{ return SGSingSettingsPage(); });
+    karaoke.value = ^NSString *{ return SGSingSummary(); };
+    karaoke.refreshOn = SGSingChangedNotification;
+    // Spatial voice is Sing's too, and shows where the iPhone reads headphone motion, as on Sing's page.
+    SGModRow *spatial = pageRow(@"Spatial voice", @"person.wave.2", ^UIViewController *{ return SGSpatialVoiceSettingsPage(); });
+    spatial.visible = ^BOOL { return SGSingSpatialAvailable(); };
+    SGModRow *audioEffects = pageRow(@"Audio effects", @"slider.vertical.3", ^UIViewController *{ return SGDSPSettingsPage(); });
+    audioEffects.value = ^NSString *{ return SGDSPSummary(); };
+    [sections addObject:SGSection(nil, @[karaoke, spatial, audioEffects])];
     [sections addObjectsFromArray:@[
         SGSection(nil, parts),
         SGSection(nil, @[

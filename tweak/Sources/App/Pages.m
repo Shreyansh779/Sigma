@@ -10,6 +10,7 @@
 #import "Native/NowPlayingBar/NowPlayingBar.h"
 #import "Native/Player/NowPlaying.h"
 #import "Shared/Haptics/Haptics.h"
+#import "Shared/Lossless/SGLossless.h"
 #import "Redesigned/Lyrics/LyricsText.h"
 #import "Redesigned/Navbar/Navbar.h"
 #import "Redesigned/NowPlayingBar/NowPlayingBar.h"
@@ -91,7 +92,17 @@ UIViewController *SGPlayerSettingsPage(void) {
     [sections addObject:SGSection(nil, pages)];
     [sections addObjectsFromArray:native ? SGNativePlayerScreenSections() : SGRNowPlayingSections()];
     // Vibrations hook Spotify's own controls and its audio, so they answer under either look.
-    [sections addObjectsFromArray:SGVibrationsSections()];
+    [sections addObject:SGSection(nil, @[SGWithSymbol(SGPageRow(@"Vibrations", ^UIViewController *{ return SGVibrationsSettingsPage(); }), @"iphone.radiowaves.left.and.right")])];
+    // Switch to video is the same chip of Spotify's player under either look.
+    [sections addObject:SGSection(native ? nil : @"Hide on the player", @[
+        SGHideRow(@"Switch to video", @"The chip over the title of a song with a music video", SGKeyHideVideoSwitch),
+    ])];
+    [sections addObject:SGNotedSection(@"Lossless", @[
+        SGOptionRow(@"Lossless files", @"Your own FLACs in place of Spotify's stream", SGKeyLossless),
+    ], @"Put FLAC or ALAC files in Files › Spotify › Lossless. A file plays when its title and length match the song "
+       @"and its sound matches what Spotify plays, from about 4 s after the song starts or you seek. Spotify still "
+       @"streams its own copy, at its lowest quality while the next song has a file. Karaoke and speeds other than "
+       @"1x keep Spotify's sound. Applies after you restart Spotify.")];
 
     return [[SGModPage alloc] initWithTitle:@"Player" intro:SGRestartNote sections:sections footer:nil];
 }

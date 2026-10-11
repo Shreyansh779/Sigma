@@ -12,3 +12,7 @@ void SGShapeGlass(UIView *glass, CGFloat radius, BOOL capsule);
 
 // The areas each look keeps transparent are its own: Native/Appearance/Repaint.h and
 // Redesigned/Kit/SGRRepaint.h.
+
+// Dark whatever the system is set to, for a controller the mod presents. A sheet's glass is its presentation's,
+// which the controller's own override does not reach. Call it after modalPresentationStyle is set.
+void SGPresentDark(UIViewController *controller);

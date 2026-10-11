@@ -25,4 +25,7 @@
 @property (nonatomic, copy) void (^browsingBegan)(void);
 // The pronunciation and translation button goes with the host's controls when they are hidden.
 @property (nonatomic) BOOL extrasHidden;
+// Sing's mic stays when the extras go, for a host that lets it take its own touches while its controls are
+// hidden (the player's lines on their own, Redesigned/Player/PlayerLyrics.x), so Sing is always in reach.
+@property (nonatomic) BOOL keepsSing;
 @end

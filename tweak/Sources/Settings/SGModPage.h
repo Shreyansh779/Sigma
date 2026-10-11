@@ -50,6 +50,11 @@
 // the page reads its rows out again and asks which of them show, rather than waiting for its next tick.
 @property (nonatomic, copy) double (^progress)(void);
 @property (nonatomic, copy) NSNotificationName refreshOn;
+// The key of a switch row on the same page this row works under: while that switch is off the row stays
+// where it is, faded, and a tap on it does nothing.
+@property (nonatomic, copy) NSString *waitsOn;
+// A menu row's (SGMenuRow): the names its pull-down menu offers, the current one being whichever `value` reads.
+@property (nonatomic, copy) NSArray<NSString *> *menu;
 @end
 
 @interface SGModSection : NSObject
@@ -60,6 +65,8 @@
 @end
 
 @interface SGModPage : SGPage
+// Asks every row's `visible` again, after something other than a switch on the page changed what it reads.
+- (void)refreshVisibility;
 - (instancetype)initWithTitle:(NSString *)title intro:(NSString *)intro sections:(NSArray<SGModSection *> *)sections footer:(NSString *)footer;
 @end
 
@@ -98,6 +105,10 @@ SGModRow *SGSliderRow(NSString *title, NSString *subtitle, double minimum, doubl
 // text, which is said, or nil once it is stored. The field starts empty: what is stored may be private.
 SGModRow *SGTextRow(NSString *title, NSString *prompt, NSString *placeholder, NSString *(^value)(void),
                     NSString *(^set)(NSString *text));
+// A setting picked from a short list without leaving the page: the value is a button whose pull-down menu
+// lists `choices`, a checkmark against the one `value` reads, and picking one runs `chosen` with its index,
+// after which the page reads every row again.
+SGModRow *SGMenuRow(NSString *title, NSArray<NSString *> *choices, NSString *(^value)(void), void (^chosen)(NSInteger index));
 SGModRow *SGStatActionRow(NSString *title, NSString *subtitle, NSString *(^value)(void), void (^action)(void));
 SGModSection *SGSection(NSString *title, NSArray<SGModRow *> *rows);
 SGModSection *SGNotedSection(NSString *title, NSArray<SGModRow *> *rows, NSString *footer);

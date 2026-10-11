@@ -45,7 +45,7 @@ static NSArray<SGIncompatibility *> *incompatibilities(void) {
             wrong.stamp = version;
             [list addObject:wrong];
         }
-        if (SGEeveeLoaded()) {
+        if (SGEeveeSpotifyInjected()) {
             SGIncompatibility *eevee = [SGIncompatibility new];
             eevee.title = @"EeveeSpotify isn't supported";
             eevee.subtitle = @"It is injected alongside Sigma";

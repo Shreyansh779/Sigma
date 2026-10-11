@@ -20,8 +20,10 @@
 // :28) and so are the bar's titles (NowPlaying_BarImpl.InformationCollectionView, home/01.txt:1104);
 // a tick when a drag or its fling carries the list past halfway to the next page, where letting go skips.
 //
-// The lyrics page's tap to seek plays its tap in Redesigned/Lyrics/SGRKaraokeView.m.
+// Gestures (Shared/Gestures) tell of each action a double tap performs; the lyrics page's tap to seek
+// plays its tap in Redesigned/Lyrics/SGRKaraokeView.m.
 #import "Core/SGCore.h"
+#import "Shared/Gestures/Gestures.h"
 #import "Shared/Player/PlayerState.h"
 #import "Haptics.h"
 
@@ -214,10 +216,26 @@ static void pageDetent(UIScrollView *list, NSInteger *lastPage) {
 }
 %end
 
+#pragma mark - gestures
+
+static void gesturePerformed(SGGestureAction action) {
+    switch (action) {
+        case SGGestureNothing: break;
+        case SGGesturePlayPause: SGPlayFeedback(SGPlayerState().isPaused ? SGFeedbackPlay : SGFeedbackPause); break;
+        case SGGestureSeekBack:
+        case SGGestureSeekForward:
+        case SGGestureNextTrack:
+        case SGGesturePreviousTrack: SGPlayFeedback(SGFeedbackSkip); break;
+        case SGGestureShuffle:
+        case SGGestureRepeat: SGPlayFeedback(SGFeedbackToggle); break;
+    }
+}
+
 %ctor {
     SGMigrateKey(SGKeyControlHapticsWas, SGKeyControlHaptics);
     SGMigrateKey(SGKeyControlStrengthWas, SGKeyControlStrength);
     %init;
+    SGGestureSetObserver(^(SGGestureAction action) { gesturePerformed(action); });
     SGRequireClasses(@[
         @"_TtCO17NowPlaying_ECMKit11ProgressBar6Slider",
         @"_TtC35NowPlaying_ContentLayerPlatformImpl24AccessibleCollectionView",

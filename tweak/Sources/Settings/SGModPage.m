@@ -212,6 +212,16 @@ SGModRow *SGViewRow(UIView *view, CGFloat height) {
     return row;
 }
 
+// The page builds the button and its menu (-menuButtonFor:), since it is the page that reads the rows again.
+SGModRow *SGMenuRow(NSString *title, NSArray<NSString *> *choices, NSString *(^value)(void), void (^chosen)(NSInteger index)) {
+    SGModRow *row = [SGModRow new];
+    row.title = title;
+    row.menu = choices;
+    row.value = value;
+    row.chosen = chosen;
+    return row;
+}
+
 SGModRow *SGSliderRow(NSString *title, NSString *subtitle, double minimum, double maximum, double step,
                       double (^get)(void), void (^set)(double value), NSString *(^format)(double value)) {
     SGModRow *row = [SGModRow new];
@@ -684,12 +694,64 @@ static void showProgress(UITableViewCell *cell, SGModRow *row, BOOL animated) {
         if (row.progress) showProgress(cell, row, YES);
         if (row.checked) showCheck(cell, row.checked());
         if (row.number && [cell isKindOfClass:SGModSliderCell.class]) [(SGModSliderCell *)cell readAgain];
+        UIButton *menu = (UIButton *)cell.accessoryView;
+        if (row.menu && [menu isKindOfClass:UIButton.class] && ![menu.accessibilityValue isEqualToString:row.value()] && !menu.isTracking) {
+            cell.accessoryView = [self menuButtonFor:row];
+            continue;
+        }
         UILabel *label = (UILabel *)cell.accessoryView;
         if (!row.value || row.page || ![label isKindOfClass:UILabel.class]) continue;
         label.text = row.value();
         [label sizeToFit];
         [cell setNeedsLayout];
     }
+}
+
+- (void)refreshVisibility {
+    [self showRowsThen:nil];
+}
+
+// The switch row a row waits on, among this page's rows.
+- (SGModRow *)switchFor:(SGModRow *)row {
+    if (!row.waitsOn) return nil;
+    for (SGModSection *s in _sections) for (SGModRow *other in s.rows) {
+        if (other != row && [other.key isEqualToString:row.waitsOn]) return other;
+    }
+    return nil;
+}
+
+- (BOOL)isWaiting:(SGModRow *)row {
+    return row.waitsOn && !SGFlag(row.waitsOn, [self switchFor:row].defaultOn);
+}
+
+// A menu row's value as a pop-up button, the way Settings draws one: the name in gray over the up and down
+// chevrons, the menu opening on the first touch. A pick runs the row's block and the page reads again.
+- (UIButton *)menuButtonFor:(SGModRow *)row {
+    NSString *current = row.value();
+    NSMutableArray<UIAction *> *items = [NSMutableArray array];
+    __weak typeof(self) weakSelf = self;
+    [row.menu enumerateObjectsUsingBlock:^(NSString *name, NSUInteger i, BOOL *stop) {
+        UIAction *item = [UIAction actionWithTitle:name image:nil identifier:nil handler:^(UIAction *action) {
+            if (row.chosen) row.chosen((NSInteger)i);
+            [weakSelf.tableView reloadData];
+        }];
+        item.state = [name isEqualToString:current] ? UIMenuElementStateOn : UIMenuElementStateOff;
+        [items addObject:item];
+    }];
+    UIButtonConfiguration *look = [UIButtonConfiguration plainButtonConfiguration];
+    look.attributedTitle = [[NSAttributedString alloc] initWithString:current ?: @"" attributes:@{NSFontAttributeName: SGTitleFont()}];
+    look.image = [UIImage systemImageNamed:@"chevron.up.chevron.down" withConfiguration:[UIImageSymbolConfiguration configurationWithPointSize:11 weight:UIImageSymbolWeightSemibold]];
+    look.imagePlacement = NSDirectionalRectEdgeTrailing;
+    look.imagePadding = 5;
+    look.baseForegroundColor = SGGrey();
+    look.contentInsets = NSDirectionalEdgeInsetsMake(8, 8, 8, 0);
+    UIButton *button = [UIButton buttonWithConfiguration:look primaryAction:nil];
+    button.menu = [UIMenu menuWithChildren:items];
+    button.showsMenuAsPrimaryAction = YES;
+    button.accessibilityLabel = row.title;
+    button.accessibilityValue = current;
+    [button sizeToFit];
+    return button;
 }
 
 - (SGModRow *)rowAt:(NSIndexPath *)path {
@@ -755,6 +817,10 @@ static void showProgress(UITableViewCell *cell, SGModRow *row, BOOL animated) {
     UITableViewCell *cell = SGDequeueCell(table, @"row");
     SGFillRowCell(cell, row);
     showProgress(cell, row, NO);
+    if (row.menu) cell.accessoryView = [self menuButtonFor:row];
+    // A row waiting on a switch that is off stays where it is, faded, and takes no tap.
+    cell.contentView.alpha = cell.accessoryView.alpha = [self isWaiting:row] ? 0.4 : 1;
+    if (row.waitsOn) cell.selectionStyle = [self isWaiting:row] ? UITableViewCellSelectionStyleNone : cell.selectionStyle;
 
     if (row.key) {
         BOOL locked = flagRowLocked(row);
@@ -790,6 +856,10 @@ static void showProgress(UITableViewCell *cell, SGModRow *row, BOOL animated) {
     if (flagRowLocked(row)) {
         [table deselectRowAtIndexPath:path animated:YES];
         [self explainLock];
+        return;
+    }
+    if ([self isWaiting:row]) {
+        [table deselectRowAtIndexPath:path animated:YES];
         return;
     }
     if (row.page) [self.navigationController pushViewController:row.page() animated:YES];
@@ -842,6 +912,12 @@ static void showProgress(UITableViewCell *cell, SGModRow *row, BOOL animated) {
         dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(wait * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{ [self.tableView reloadData]; });
     };
     BOOL moved = [self showRowsThen:row.changed ? reload : nil];
+    // The rows waiting on this switch stay where they are and fade to their new state.
+    NSMutableArray<NSIndexPath *> *waiting = [NSMutableArray array];
+    for (NSIndexPath *visible in self.tableView.indexPathsForVisibleRows) {
+        if ([[self rowAt:visible].waitsOn isEqualToString:row.key]) [waiting addObject:visible];
+    }
+    if (waiting.count) [self.tableView reloadRowsAtIndexPaths:waiting withRowAnimation:UITableViewRowAnimationFade];
     if (row.changed && !moved) reload();
     if (on && row.warning) [self warn:row];
 }
