@@ -77,3 +77,8 @@ void SGRActivate(UIView *source);
 // else those for touch up inside. NO when the control has neither (an Encore control that reads its
 // touches through a gesture recognizer); what was found is logged once per class.
 BOOL SGRFire(UIControl *control);
+
+// Whether `view` is the profile avatar that opens the side drawer, in the Home, Search and Library headers. Known by
+// its identifier, which every version gives it: 9.1.88 draws it in an AdaptiveFaceContainer, 9.1.90 in an Encore
+// button around a listening-activity pulse, which a check by class alone took for something else.
+BOOL SGRIsAvatar(UIView *view);

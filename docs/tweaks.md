@@ -18,12 +18,16 @@
     tweak/Sources/Diagnostics/  screen dumps, the tree server and the main thread hang sampler of FLEX builds
     extension/AppGroups/        a dylib loaded by Spotify and its home screen widget that moves Spotify's App Groups
                                 into a group the re-signed IPA has; without it the widget stays a placeholder
+    extension/LiveActivity/     the Live Activity widget, a WidgetKit extension of its own, built into the IPA by
+                                scripts/build-extension.sh (Xcode's Swift; an IPA built without Xcode has no card)
     scripts/                    pipeline.sh (build + inject), insert-dylib.py (a load command into
                                 Spotify's widget), install.sh (sign + install), record-trees.py, record-session.py,
-                                dump-log.sh, extract-flags.py
+                                dump-log.sh, extract-flags.py, build-extension.sh (the Live Activity's appex and its App Intents
+                                metadata), merge-appintents.py (that metadata into Spotify's own)
     trees/                      recorded view trees, one per screen; the input for every new hook. trees/clean/ holds
                                 the numbered snapshots per screen of record-session.py, taken of Spotify as it came
-    plist/                      Info.plist overrides merged into the app (turns UIDesignRequiresCompatibility off)
+    plist/                      Info.plist overrides merged into the app (turns UIDesignRequiresCompatibility off, allows
+                                Live Activities and Music Haptics)
     vendor/                     AutoFLEX deb; audio/, the third-party C of the audio effects (libbs2b, WDL's EEL2) and
                                 the EEL2 parser of the mod's own, built by its own Makefile into a static library the
                                 tweak links (its README names the upstream commits and the licenses)
@@ -136,7 +140,9 @@ Shared:
                   a stop keeping what came in for the next download to carry on from; the 489 MB model downloaded
                   before is kept and loaded on the CPU alone until this one is in (the Voice model row then reads
                   Update available), and deleted as its download ends or at a launch that finds both
-                  (SGSingRemoveOldModel, which logs the space freed), Sing moving to the new one at its next load;
+                  (SGSingRemoveOldModel, which logs the space freed) or by hand from the Delete the old voice model row of the
+                  Karaoke page, shown while the old files are there (SGSingDeleteOldModel; it switches Karaoke off when it was running
+                  on them, and a folder from before Sigma was named spoti.pw is moved across first), Sing moving to the new one at its next load;
                   loaded only while Spotify
                   is active (SGSingLoader.m), on any iPhone with iOS 18, a CPU copy first and warmed, only with 1 GB left to the
                   process (no floor on the iPhone's memory: both copies warm add 0.1 GB of footprint), then on Automatic, where the iPhone has a
@@ -331,6 +337,38 @@ Shared:
                   (SGHeadMotionListen: Karaoke's spatial voice), and runs for them with the switch off, the detector then
                   unfed. The detector is
                   tested on the Mac against harness/head-gestures/, the hook and the page in the simulator against its sim/
+    LiveActivity/ a Live Activity on the lock screen and in the Dynamic Island in one of three views, the line being
+                  sung with the next one under it, the tracks up next (a tap on one skipping ahead to it), or a control
+                  menu of tabs, Controls (previous, play and pause, next, shuffle, repeat), Queue and a sleep Timer of
+                  the mod's own (Player/SleepTimer.m: 15 min, 30 min, 1 hour, End of track, End of album) that fades
+                  the sound out and pauses Spotify, and stays set when the card is switched off (LiveActivity.h lists its files): a timer polls the player and
+                  sends a new state only when what the view shows changes, local updates only, no push, and asks ActivityKit
+                  only then. It ticks four times a second in the lyrics view and once a second in the others. The card
+                  is tinted with the cover's color and shows the cover itself, a JPEG of a few dozen pixels inside
+                  the state, which ActivityKit caps at 4 KB (the bridge sends it without the cover when it would
+                  not fit); the color is darkened to a luminance of 0.04 at most, so the white text keeps 4.5:1 on any
+                  cover, and the cover is read only once the now playing title is the new track's. The page's options
+                  ride in the state too, read on every tick, so they apply within a tick: the lines' alignment, what the
+                  lyrics view shows on a track with no timed lyrics (a note under the track, or the track large), the
+                  colors (Spotify's green; Artwork, the cover's color lightened to about the green's luminance in its
+                  place; Plain, white on the system's own background), and the progress bar. Artwork off sends no
+                  cover at all. The page's preview (SGLiveActivityPreview.m) is a mock of the card in UIKit, not the
+                  widget, checked in the simulator against harness/live-activity-page/. Taps are
+                  LiveActivityIntents run inside Spotify and take a second or two to show on the card. The widget is extension/LiveActivity; ActivityKit pairs the two
+                  by the attributes' type in LiveActivityShared.swift, compiled into both. It starts only with Spotify
+                  in front; its settings apply at once. It ends when Spotify is swiped away while running; killed
+                  while suspended, Spotify cannot end it, so each state goes stale a minute on (an unchanged card is
+                  sent again every 20 s) and a launch ends any left over before it starts a new one. The same folder
+                  gives Siri, the Shortcuts app and the Action button Like This Song, Play or Pause, Next and Previous
+                  Track, Karaoke and Sleep Timer (AppShortcuts.swift lists them as Spotify's App Shortcuts), and iOS 18
+                  controls for Control Center and the lock screen of Like, Karaoke and the sleep timer
+                  (extension/LiveActivity/Controls.swift), buttons, as the extension cannot read Karaoke's state. Each is
+                  a LiveActivityIntent or AudioPlaybackIntent, so it runs inside Spotify, launched in the background
+                  when needed, and LiveActivity.x answers it with the activity on or off, Like through
+                  HeadGestures.x's collection platform and Karaoke through SGSetSingOn; the sleep timer (15 min, 30 min,
+                  1 hour, End of track, End of album or Off) is the card's own, Player/SleepTimer.m, which keeps its
+                  own clock with the activity off. The intent asks again for 8 s while the player is not up,
+                  then tells Siri to open Spotify. Checked in the simulator against harness/shortcuts/
     Gestures/     the double tap zones on the player: the grid, what each cell does, the recognizer (each look hooks it on)
 
 Native:
@@ -536,13 +574,19 @@ in the native look also Now playing bar (its device button and its flags), Queue
 Spotify's own player screen (artwork background, glass header buttons, Disable Canvas and the sheet,
 header, slider and sticky header flags, the cards under the player and the lyrics preview and player
 buttons to hide); in the redesign instead, right on the Player page, its device button and the Background behind the player: Fluid
-artwork, the default, the cover itself Kawase blurred and warped on Metal, ported from kawarp (Redesigned/Kit/SGRWarp.m), or Animated
+artwork, the default, the cover itself Kawase blurred and warped on Metal, ported from kawarp (Redesigned/Kit/SGRWarp.m), or the
+Visualizer, a calm spectrum of what plays in two soft hills of the cover's colours over Fluid artwork held still (PlayerVisualiser.m,
+SGRSpectrum.m: Spotify's output read through the audio effects' notify, 24 bands, drawn at 60 frames a second, 30 behind the lyrics,
+stopped in Low Power Mode and with Reduce Motion on), or Animated
 artwork, the track's Canvas or the album's Apple Music 3:4 cover looping muted over it (Redesigned/Player/PlayerAnimated.x), the square cover fading out as it fades in and back as it goes, found
 the lock screen's way in an order of its own (a Sources page) and falling back to Fluid artwork for a track
 without a clip, while one is fetched, while Spotify shows its own music video, and in Low Power Mode or with Reduce Motion on; the
 choice is picked in place, applies at once and brings its own settings up under it: for Fluid artwork a live preview over Speed,
-Warp, Blur, Saturation and Brightness, which the player follows as they move, and Reset; for Animated artwork its Sources; laid out against harness/kawarp/, the player's side against harness/player/ (its fluid and
-animated scenarios). Then Vibrations under either look, a card for
+Warp, Blur, Saturation and Brightness, which the player follows as they move, and Reset; for the Visualizer the same preview with the hills over it and the same sliders (it takes Fluid artwork's look); for Animated artwork its Sources; laid out against harness/kawarp/, the player's side against harness/player/ (its fluid and
+animated scenarios). Then a Controls card: Volume (on until switched off; PlayerVolume.m), the system's slider under the controls for this iPhone or the Connect device's, and
+Follow the cover (off until switched on; PlayerCoverAccent.x), which paints Spotify's lit like, shuffle and repeat in the most colourful of the cover's
+five colours instead of the accent, once per cover, a grey cover giving the accent back: Spotify bakes the accent into those controls' images, backgrounds and
+Lottie shapes, so the player recolours each of them itself over its bottom stack whenever the colour or a button changes. Then Vibrations under either look, a card for
 Controls (on until switched off) and one for Music Haptics (off until switched on, with an ⓘ saying it
 follows the sound this iPhone plays while Spotify is open), each opening out while its switch is on:
 Controls into its Strength (10 to 100%, a tap at the new strength with each step), Music Haptics into its
