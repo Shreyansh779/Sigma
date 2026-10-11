@@ -8,6 +8,9 @@
 //
 //     PlayerField.x      the switch's flags and rows, the field in the background plane, the cover it reads
 //     PlayerAnimated.x   Animated artwork: the Canvas or Apple Music's cover looping over the field
+//     PlayerVisualiser.m the Visualizer background: a calm spectrum of the song in the cover's colours, read
+//                        through SGRSpectrum.m from the audio effects' tap on Spotify's output
+//     PlayerCoverAccent.x  Follow the cover: the like, shuffle and repeat painted in the cover's colour
 //     PlayerBackgroundSettings.m  what moves behind the player, and Fluid artwork's sliders under a preview
 //     PlayerArtwork.x    the cover's corners, shadow and paused shrink, the lyric preview under it hidden,
 //                        and every cover gone while an Animated artwork clip shows
@@ -47,6 +50,7 @@
 typedef NS_ENUM(NSInteger, SGRPlayerBackground) {
     SGRPlayerBackgroundFluid,      // the artwork itself warped (SGRWarp.h)
     SGRPlayerBackgroundAnimated,   // a clip over Fluid artwork, where the track has one (PlayerAnimated.x)
+    SGRPlayerBackgroundVisualiser, // a spectrum of the song over Fluid held still (PlayerVisualiser.m)
 };
 SGRPlayerBackground SGRPlayerBackgroundStyle(void);
 // Posted when the choice changes, so the player follows without a restart.
@@ -98,6 +102,29 @@ CGRect SGRPlayerArtworkAreaIn(UIView *host);
 void SGRPlayerSetCoverHidden(BOOL hidden);
 // Every cover in the list going or coming back over `duration`, as SGRPlayerAnimatedShowing now says.
 void SGRPlayerCoversFollowClip(NSTimeInterval duration);
+
+#pragma mark - the Visualizer (PlayerVisualiser.m)
+
+// The background is the Visualizer.
+BOOL SGRPlayerVisualiserShowing(void);
+// Puts the hills on the field or takes them off as the background says, lays them out, and blurs them while the
+// lyrics are open. Called on every layout pass of the field (PlayerField.x), when the lyrics come or go
+// (PlayerFooter.x) and when the background changes; cheap when nothing changed.
+void SGRPlayerVisualiserUpdate(void);
+// A view of its own drawing the same hills, for the Player page's preview. It moves only in a window.
+UIView *SGRPlayerVisualiserPreview(void);
+// The field holds still while the song is paused, a clip covers it or the hills move over it.
+void SGRPlayerHoldField(void);
+
+#pragma mark - Follow the cover (PlayerCoverAccent.x)
+
+// The player's lit controls painted in the cover's colour instead of the accent. Off until switched on, read at
+// launch. The cover's colour (a grey one gives the accent back), and a paint of Spotify's bottom stack, which the
+// footer's layout asks for.
+#define SGRKeyPlayerFollowsCover @"spotifyglass.redesign.player.followsCover"
+BOOL SGRPlayerFollowsCover(void);
+void SGRPlayerSetCoverAccent(UIColor *cover);
+void SGRPlayerPaintCover(UIView *stack);
 
 #pragma mark - landscape lyrics (PlayerLandscape.x)
 

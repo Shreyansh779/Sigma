@@ -96,6 +96,23 @@ xcrun --sdk iphoneos clang -target arm64-apple-ios16.0 -dynamiclib -fobjc-arc -O
   -install_name @rpath/SpotifyGlassAppGroups.dylib -o "$GROUPS_DYLIB" "$ROOT/extension/AppGroups/AppGroups.m"
 FILES+=("$GROUPS_DYLIB")
 
+# The Live Activity (Shared/LiveActivity) draws in a widget extension of its own, which needs Xcode's Swift and its
+# App Intents metadata processor. A failure leaves the IPA without it: Mod Settings > Live Activity then does nothing.
+EXT_DIR=""
+if xcrun --sdk iphoneos --find swiftc >/dev/null 2>&1; then
+  echo "==> building the Live Activity extension"
+  unzip -p "$IN" "${APP_DIR}Info.plist" > "$ROOT/out/.info.plist"
+  if "$ROOT/scripts/build-extension.sh" "$ROOT/out/.info.plist" "$ROOT/out/extension"; then
+    EXT_DIR="$ROOT/out/extension"
+    FILES+=("$EXT_DIR/SpotifyGlassLiveActivity.appex")
+  else
+    echo "    the Live Activity extension failed: building without it"
+  fi
+  rm -f "$ROOT/out/.info.plist"
+else
+  echo "==> no Xcode selected: building without the Live Activity extension"
+fi
+
 echo "==> injecting"
 # -w drops the Watch app: its companion-app key would still name com.spotify.client and block the install.
 unzip -p "$IN" "${APP_DIR}Info.plist" > "$ROOT/out/.info.plist"
@@ -128,6 +145,12 @@ echo "==> adding the alternate app icons"
 echo "==> making the launch screen plain"
 # A failure leaves Spotify's launch screen.
 "$ROOT/scripts/launch-screen.sh" "$OUT" || echo "    the launch screen failed: left as Spotify's"
+
+if [ -n "$EXT_DIR" ]; then
+  echo "==> adding the Live Activity's intents to Spotify's App Intents metadata"
+  # A failure leaves the IPA as it was: the card shows, its taps do nothing.
+  "$ROOT/scripts/merge-appintents.py" "$OUT" "$APP_DIR" "$EXT_DIR/app/Metadata.appintents" || echo "    the intents failed: the card's taps will not work"
+fi
 
 echo "==> done: $OUT"
 [ "$INSTALL" = 1 ] && exec "$ROOT/scripts/install.sh" "$OUT"

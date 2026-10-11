@@ -224,6 +224,21 @@ UIViewController *SGSingSettingsPage(void) {
     });
     remove.color = SGRed();
     remove.visible = ^BOOL { return SGSingModelCurrentState() == SGSingModelReady || SGSingModelPausedBytes() > 0; };
+    SGModRow *removeOld = SGActionRow(@"Delete the old voice model", nil, ^{
+        BOOL inUse = SGSingModelUpdateAvailable();
+        ask(@"Delete the old voice model?",
+            [NSString stringWithFormat:inUse ? @"It frees %@. Karaoke has no voice model until you download the new one (%@), which runs on the Neural Engine."
+                                             : @"It frees %@. The new voice model is already in, so Karaoke does not need it.",
+                                       SGSingOldModelSizeText(), SGSingModelSizeText()],
+            @"Delete", YES, ^{
+                if (SGSingModelUpdateAvailable()) SGSetSingOn(NO);
+                SGSingDeleteOldModel();
+                [page.tableView reloadData];
+            });
+    });
+    removeOld.color = SGRed();
+    removeOld.symbol = @"trash";
+    removeOld.visible = ^BOOL { return SGSingOldModelPresent(); };
     SGModRow *spatial = SGPageRow(@"Spatial voice", ^UIViewController *{ return SGSpatialVoiceSettingsPage(); });
     spatial.subtitle = @"With AirPods, the voice stays in front of you as you turn your head";
     spatial.value = ^NSString *{ return SGSingSpatial() ? @"On" : @"Off"; };
@@ -240,7 +255,7 @@ UIViewController *SGSingSettingsPage(void) {
     SGModRow *prepare = SGSwitchRow(@"Prepare after updates",
                                     @"Readies the Neural Engine in the background after Sigma or iOS updates, so Karaoke starts at full speed", SGKeySingPrepareAhead);
     SGSingPage *made = [[SGSingPage alloc] initWithTitle:@"Karaoke" intro:nil sections:@[
-        SGSection(nil, @[sing, button, heat, memory, model, remove]),
+        SGSection(nil, @[sing, button, heat, memory, model, remove, removeOld]),
         SGSection(nil, @[spatial]),
         SGNotedSection(@"Advanced", @[units, prepare],
                        @"Karaoke turns a song's vocals down to sing over, or the rest down to hear the vocals alone, with a voice model that "

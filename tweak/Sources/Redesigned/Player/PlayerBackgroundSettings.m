@@ -1,6 +1,7 @@
-// The player's background on Mod Settings' Player page: Fluid artwork or Animated artwork picked in place,
-// and under it the settings of the one picked: Fluid artwork's sliders under a preview drawn by the same
-// renderer as the player's field, or Animated artwork's sources.
+// The player's background on Mod Settings' Player page: Fluid artwork, Animated artwork or the Visualizer picked
+// in place, and under it the settings of the one picked: Fluid artwork's sliders (the Visualizer moves over Fluid
+// artwork and takes its look) under a preview drawn by the same renderer as the player's field, with the hills
+// over it for the Visualizer, or Animated artwork's sources.
 #import "Core/SGCore.h"
 #import "Settings/SGModPage.h"
 #import "Settings/SGPageStyle.h"
@@ -49,7 +50,7 @@ static void migrate(void) {
 SGRPlayerBackground SGRPlayerBackgroundStyle(void) {
     migrate();
     NSInteger style = SGInt(SGRKeyPlayerBackground, kDefaultBackground);
-    return style >= SGRPlayerBackgroundFluid && style <= SGRPlayerBackgroundAnimated ? (SGRPlayerBackground)style : kDefaultBackground;
+    return style >= SGRPlayerBackgroundFluid && style <= SGRPlayerBackgroundVisualiser ? (SGRPlayerBackground)style : kDefaultBackground;
 }
 
 // The ⋯ menu's Animated artwork switch (Shared/Player/SpeedPitchMenu.x puts it under the sliders of the sheet
@@ -63,6 +64,7 @@ BOOL SGPlayerMenuAnimatedArtwork(void) {
 }
 
 void SGPlayerMenuSetAnimatedArtwork(BOOL on) {
+    if (on == SGPlayerMenuAnimatedArtwork()) return;
     SGSetInt(SGRKeyPlayerBackground, on ? SGRPlayerBackgroundAnimated : SGRPlayerBackgroundFluid);
     [NSNotificationCenter.defaultCenter postNotificationName:SGRPlayerBackgroundDidChangeNotification object:nil];
 }
@@ -92,6 +94,7 @@ static const CGFloat kPreviewHeight = 240, kPreviewRadius = 26;
 
 @implementation SGRFluidPreview {
     CGSize _laidOutFor;
+    UIView *_hills;
 }
 
 - (instancetype)initWithFrame:(CGRect)frame {
@@ -104,12 +107,25 @@ static const CGFloat kPreviewHeight = 240, kPreviewRadius = 26;
     NSNotificationCenter *center = NSNotificationCenter.defaultCenter;
     [center addObserver:self selector:@selector(showLook) name:SGRPlayerFluidLookDidChangeNotification object:nil];
     [center addObserver:self selector:@selector(showArtwork) name:SGRNowPlayingArtworkDidChangeNotification object:nil];
+    [center addObserver:self selector:@selector(showHills) name:SGRPlayerBackgroundDidChangeNotification object:nil];
+    [self showHills];
     return self;
+}
+
+// The Visualizer's hills over the field while that is the choice; they move only in a window.
+- (void)showHills {
+    BOOL wanted = SGRPlayerBackgroundStyle() == SGRPlayerBackgroundVisualiser;
+    if (wanted == (_hills != nil)) return;
+    [_hills removeFromSuperview];
+    _hills = wanted ? SGRPlayerVisualiserPreview() : nil;
+    if (_hills) [self addSubview:_hills];
+    [self setNeedsLayout];
 }
 
 - (void)layoutSubviews {
     [super layoutSubviews];
     CGSize size = self.bounds.size;
+    _hills.frame = self.bounds;
     if (CGSizeEqualToSize(size, _laidOutFor) || size.width < 1) return;
     _laidOutFor = size;
     CGSize screen = self.window.bounds.size.width > 0 ? self.window.bounds.size : UIScreen.mainScreen.bounds.size;
@@ -147,10 +163,19 @@ static NSArray<SGModRow *> *shownFor(SGRPlayerBackground background, NSArray<SGM
     return rows;
 }
 
+// The Visualizer moves over Fluid artwork, so the two share its preview and sliders.
+static NSArray<SGModRow *> *shownForFluidField(NSArray<SGModRow *> *rows) {
+    for (SGModRow *row in rows) {
+        row.visible = ^BOOL { return SGRPlayerBackgroundStyle() == SGRPlayerBackgroundFluid || SGRPlayerBackgroundStyle() == SGRPlayerBackgroundVisualiser; };
+    }
+    return rows;
+}
+
 NSArray<SGModSection *> *SGRPlayerBackgroundSections(void) {
     migrate();
-    NSArray<SGModRow *> *choices = SGChoiceListRows(SGRKeyPlayerBackground, @[@"Fluid artwork", @"Animated artwork"],
-        @[@"The cover itself, blurred and slowly warped", @"The track's Canvas or the album's animated cover, looping"],
+    NSArray<SGModRow *> *choices = SGChoiceListRows(SGRKeyPlayerBackground, @[@"Fluid artwork", @"Animated artwork", @"Visualizer"],
+        @[@"The cover itself, blurred and slowly warped", @"The track's Canvas or the album's animated cover, looping",
+          @"A calm spectrum of the song over Fluid artwork"],
         kDefaultBackground, ^(NSInteger index) {
             [NSNotificationCenter.defaultCenter postNotificationName:SGRPlayerBackgroundDidChangeNotification object:nil];
         });
@@ -171,11 +196,11 @@ NSArray<SGModSection *> *SGRPlayerBackgroundSections(void) {
     SGModRow *lowData = SGOptionRow(@"Download in Low Data Mode", @"Up to about 7 MB a song", SGKeyMotionLowData);
 
     return @[
-        SGNotedSection(@"Background", choices, @"A paused song holds the background still."),
-        SGSection(nil, shownFor(SGRPlayerBackgroundFluid, @[preview])),
-        SGNotedSection(nil, shownFor(SGRPlayerBackgroundFluid, sliders),
+        SGNotedSection(@"Background", choices, @"A paused song holds the background still. The Visualizer stops in Low Power Mode and with Reduce Motion on."),
+        SGSection(nil, shownForFluidField(@[preview])),
+        SGNotedSection(nil, shownForFluidField(sliders),
                        @"The player follows these as they move. Brightness past 100% can make white text harder to read on a light cover."),
-        SGSection(nil, shownFor(SGRPlayerBackgroundFluid, @[reset])),
+        SGSection(nil, shownForFluidField(@[reset])),
         SGNotedSection(nil, shownFor(SGRPlayerBackgroundAnimated, @[sources, lowData]),
                        @"A track without a clip shows Fluid artwork, and so does every track in Low Power Mode or with Reduce Motion on."),
     ];
