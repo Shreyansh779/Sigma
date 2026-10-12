@@ -34,7 +34,9 @@ static BOOL headingLabels(UIView *shelf, UILabel **title, UILabel **over) {
     if (![shelf isKindOfClass:UICollectionView.class]) return NO;
     SGRHomeHeadingCache *cache = objc_getAssociatedObject(shelf, &kCacheKey);
     UILabel *cached = cache.title;
-    if (cached && cached.window && [cached.text isEqualToString:cache.text]) {
+    // A shelf off screen has no window, and was laid out again for every measuring of it, which is the stall: the labels
+    // found are good while the title label has the text it had.
+    if (cached && [cached.text isEqualToString:cache.text]) {
         *title = cached;
         *over = cache.over;
         return YES;
