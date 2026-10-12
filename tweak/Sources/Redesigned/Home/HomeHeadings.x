@@ -71,7 +71,7 @@ static void restyle(UIView *button) {
         objc_setAssociatedObject(shelf, &kAskedKey, identity, OBJC_ASSOCIATION_COPY_NONATOMIC);
         SGRHomeNoteShelf(identity);
         BOOL wanted = !SGRHomeInTopPicks(heading) && SGEnabled(SGRKeyHomeTopPicks) && [identity isEqualToString:SGRHomeTopPicksFrom()];
-        if (SGRHomeShelfHidden(identity) || wanted) SGRHomeMeasureAgain(heading);
+        if (SGRHomeShelfHidden(identity) || wanted || SGRHomeSectionWaiting(heading)) SGRHomeMeasureAgain(heading);
     }
     UILabel *mine = objc_getAssociatedObject(button, &kTitleKey);
     UILabel *theirs = titleLabelIn(button, mine);
