@@ -43,7 +43,10 @@ static void collapse(UIView *cell, UIView *content, CGFloat natural) {
     objc_setAssociatedObject(cell, &kCollapsedKey, @(natural), OBJC_ASSOCIATION_RETAIN_NONATOMIC);
     if (content.autoresizingMask & UIViewAutoresizingFlexibleHeight) content.autoresizingMask &= ~UIViewAutoresizingFlexibleHeight;
     CGRect frame = CGRectMake(0, 0, cell.bounds.size.width, natural);
-    if (!CGRectEqualToRect(content.frame, frame)) content.frame = frame;
+    // Never in an animation: Spotify's animated layout changes lay these cells out inside one, and a frame set there makes
+    // UIKit lay the card's whole content out first, hidden as it is. That held the main thread for the 10 s the watchdog
+    // allows (two crash reports, 2026-10-12, both in an animated layout change of the list).
+    if (!CGRectEqualToRect(content.frame, frame)) [UIView performWithoutAnimation:^{ content.frame = frame; }];
     if (!content.hidden) content.hidden = YES;
     if (!cell.clipsToBounds) cell.clipsToBounds = YES;
 }
@@ -82,7 +85,7 @@ static void collapse(UIView *cell, UIView *content, CGFloat natural) {
     objc_setAssociatedObject(self, &kCollapsedKey, nil, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
     UIView *content = ((UIView *)self).subviews.firstObject;
     content.autoresizingMask |= UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
-    content.frame = ((UIView *)self).bounds;
+    [UIView performWithoutAnimation:^{ content.frame = ((UIView *)self).bounds; }];
     content.hidden = NO;
 }
 %end

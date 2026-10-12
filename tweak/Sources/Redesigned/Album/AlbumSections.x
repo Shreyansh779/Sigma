@@ -69,7 +69,8 @@ static void settle(UICollectionViewCell *cell, CGFloat natural, CGFloat lead) {
     objc_setAssociatedObject(cell, &kSettledKey, @[@(natural), @(lead)], OBJC_ASSOCIATION_RETAIN_NONATOMIC);
     if (content.autoresizingMask & UIViewAutoresizingFlexibleHeight) content.autoresizingMask &= ~UIViewAutoresizingFlexibleHeight;
     CGRect frame = CGRectMake(0, lead, cell.bounds.size.width, natural);
-    if (!CGRectEqualToRect(content.frame, frame)) content.frame = frame;
+    // Not in an animation, as Player/PlayerCards.x.
+    if (!CGRectEqualToRect(content.frame, frame)) [UIView performWithoutAnimation:^{ content.frame = frame; }];
     BOOL dropped = lead == 0;
     if (content.hidden != dropped) content.hidden = dropped;
     if (!cell.clipsToBounds) cell.clipsToBounds = YES;
@@ -80,7 +81,7 @@ static void unsettle(UICollectionViewCell *cell) {
     UIView *content = cell.contentView;
     objc_setAssociatedObject(cell, &kSettledKey, nil, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
     content.autoresizingMask |= UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
-    content.frame = cell.bounds;
+    [UIView performWithoutAnimation:^{ content.frame = cell.bounds; }];
     content.hidden = NO;
     cell.clipsToBounds = NO;
     cell.accessibilityElementsHidden = NO;
