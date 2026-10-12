@@ -14,7 +14,7 @@
 
 static NSInteger sg_cover = -1;   // 0xRRGGBB while a cover gives one, else -1
 static __weak UIView *sg_stack;   // the bottom stack last painted
-static char kOriginalKey, kTintedKey, kAccentImageKey, kOriginalFillKey, kOriginalStrokeKey;
+static char kOriginalKey, kTintedKey, kTintedCoverKey, kAccentImageKey, kOriginalFillKey, kOriginalStrokeKey;
 
 BOOL SGRPlayerFollowsCover(void) {
     static BOOL on;
@@ -98,10 +98,13 @@ static void paintImageView(UIImageView *view) {
         objc_setAssociatedObject(view, &kTintedKey, nil, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
         return;
     }
-    if (image == tinted && tinted) return;
+    // Tinted already, but in the last song's cover: a new cover gives Spotify's button no new image, so without this
+    // the shuffle and repeat kept the old color until a tap handed them one.
+    if (image == tinted && tinted && [objc_getAssociatedObject(view, &kTintedCoverKey) integerValue] == sg_cover) return;
     UIImage *made = [original imageWithTintColor:coverColor() renderingMode:UIImageRenderingModeAlwaysOriginal];
     objc_setAssociatedObject(view, &kOriginalKey, original, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
     objc_setAssociatedObject(view, &kTintedKey, made, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    objc_setAssociatedObject(view, &kTintedCoverKey, @(sg_cover), OBJC_ASSOCIATION_RETAIN_NONATOMIC);
     view.image = made;
 }
 

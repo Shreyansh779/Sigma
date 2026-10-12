@@ -140,6 +140,8 @@ void SGRPlayerShowLandscape(BOOL show);
 BOOL SGRPlayerVolumeOn(void);
 // YES when the row shows; NO when it is off, has no controls to sit under or no room between them and the footer.
 BOOL SGRPlayerPlaceVolume(UIView *stack, UIView *controls, UIView *row, CGFloat margin);
+// Again, where the footer last placed it: for the passes of the other units, and a new track.
+void SGRPlayerPlaceVolumeAgain(void);
 // Whether `view` is that row, which the footer's layout must not take for Spotify's controls.
 BOOL SGRPlayerIsVolumeRow(UIView *view);
 

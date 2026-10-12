@@ -102,12 +102,20 @@ BOOL SGRPlayerVolumeOn(void) {
     return on;
 }
 
+// What the footer last placed it against, so the pass of another unit can place it again.
+static __weak UIView *sg_placedStack, *sg_placedControls, *sg_placedRow;
+static CGFloat sg_placedMargin;
+
 BOOL SGRPlayerPlaceVolume(UIView *stack, UIView *controls, UIView *row, CGFloat margin) {
     SGRVolumeRow *volume = objc_getAssociatedObject(stack, &kVolumeKey);
     if (!SGRPlayerVolumeOn() || !controls) {
         if (volume) volume.alpha = 0;
         return NO;
     }
+    sg_placedStack = stack;
+    sg_placedControls = controls;
+    sg_placedRow = row;
+    sg_placedMargin = margin;
     if (!volume) {
         volume = [SGRVolumeRow new];
         objc_setAssociatedObject(stack, &kVolumeKey, volume, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
@@ -129,4 +137,12 @@ BOOL SGRPlayerPlaceVolume(UIView *stack, UIView *controls, UIView *row, CGFloat 
     if (!fits) volume.alpha = 0;
     else if (volume.alpha < 0.01 && controls.alpha > 0.99) volume.alpha = 1;
     return fits;
+}
+
+// The footer places the row only when its own unit lays out, and a new track moves the controls and the footer
+// without that: the row stayed where the last song's layout had it, over the progress bar or the buttons.
+void SGRPlayerPlaceVolumeAgain(void) {
+    UIView *stack = sg_placedStack, *controls = sg_placedControls, *row = sg_placedRow;
+    if (!stack.window || !controls || !row) return;
+    SGRPlayerPlaceVolume(stack, controls, row, sg_placedMargin);
 }
