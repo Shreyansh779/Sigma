@@ -211,7 +211,8 @@ static NSString *swiftString(const unsigned char *at) {
     return [[NSString alloc] initWithBytes:bytes length:(NSUInteger)count encoding:NSASCIIStringEncoding];
 }
 
-static NSString *sectionKey(UIView *content) {
+// The shelf's data in the cell's content (a HomeStructure object: ShelfData, RecentsData...), nil when it is not found.
+static const unsigned char *shelfData(UIView *content, Class *dataClass) {
     static Ivar configuration, after;
     static BOOL looked;
     if (!looked) {
@@ -221,9 +222,9 @@ static NSString *sectionKey(UIView *content) {
             after = class_getInstanceVariable(c, "elementView");
         }
     }
-    if (!configuration || !after) return nil;
+    if (!configuration || !after) return NULL;
     ptrdiff_t from = ivar_getOffset(configuration), to = ivar_getOffset(after);
-    if (to <= from || to - from > 512) return nil;
+    if (to <= from || to - from > 512) return NULL;
     const unsigned char *base = (const unsigned char *)(__bridge void *)content;
     for (ptrdiff_t at = from; at + 8 <= to; at += 8) {
         uint64_t word = 0;
@@ -233,20 +234,29 @@ static NSString *sectionKey(UIView *content) {
         Class cls = object_getClass((__bridge id)(const void *)address);
         const char *name = cls ? class_getName(cls) : NULL;
         if (!name || strncmp(name, "_TtCO16Home_EvoPageImpl13HomeStructure", 38) != 0) continue;
-        Ivar sectionID = class_getInstanceVariable(cls, "sectionID") ?: class_getInstanceVariable(cls, "sectionId");
-        if (!sectionID) continue;
-        NSString *key = swiftString((const unsigned char *)address + ivar_getOffset(sectionID));
-        static int logged;
-        if (SGDebugLog() && logged < 6) {
-            logged++;
-            Ivar heading = class_getInstanceVariable(cls, "heading");
-            NSMutableString *hex = [NSMutableString string];
-            if (heading && (size_t)ivar_getOffset(heading) + 32 <= malloc_size((const void *)address)) for (int i = 0; i < 32; i++) [hex appendFormat:@"%02x", ((const unsigned char *)address)[ivar_getOffset(heading) + i]];
-            SGLog(@"home section data: %s sectionID %@, heading bytes %@", name, key ?: @"(unreadable)", hex);
-        }
-        return key;
+        if (dataClass) *dataClass = cls;
+        return (const unsigned char *)address;
     }
-    return nil;
+    return NULL;
+}
+
+static NSString *sectionKey(UIView *content) {
+    Class cls = Nil;
+    const unsigned char *data = shelfData(content, &cls);
+    if (!data) return nil;
+    Ivar sectionID = class_getInstanceVariable(cls, "sectionID") ?: class_getInstanceVariable(cls, "sectionId");
+    return sectionID ? swiftString(data + ivar_getOffset(sectionID)) : nil;
+}
+
+// The shelf's title as its data has it, before any view: the heading's first field is a String. What a heading's title
+// is in the data is the heading's text in the view, for a plain one ("Recents", "Popular artists"); a shelf with a small
+// line over its title is known by the identity the view gives it (SGRHomeShelfIdentity), learned under its section id.
+static NSString *dataTitle(UIView *content) {
+    Class cls = Nil;
+    const unsigned char *data = shelfData(content, &cls);
+    Ivar heading = data ? class_getInstanceVariable(cls, "heading") : NULL;
+    if (!heading || (size_t)ivar_getOffset(heading) + 16 > malloc_size(data)) return nil;
+    return swiftString(data + ivar_getOffset(heading));
 }
 
 static NSMutableDictionary<NSString *, NSString *> *shelfIds(void) {
@@ -277,6 +287,10 @@ static SGRHomeKind kindOf(UIView *content, NSString **rootName) {
         if (!SGRHomeShelfFilterActive()) return SGRHomeKindKeep;
         NSString *key = sectionKey(content), *known = key ? shelfIds()[key] : nil;
         if (known) return SGRHomeShelfHidden(known) ? SGRHomeKindDrop : SGRHomeKindKeep;
+        // A hidden shelf is dropped in the pass that sizes it, never shown first and hidden after: that shrinks the page
+        // under the finger, and at its foot pushes the reader back up.
+        NSString *title = dataTitle(content);
+        if (title && SGRHomeShelfHidden(title)) return SGRHomeKindDrop;
         SGRHomeKind kind = shelfKind(root);
         NSString *identity = key ? SGRHomeShelfIdentity(root) : nil;
         if (identity) learnShelf(key, identity);
