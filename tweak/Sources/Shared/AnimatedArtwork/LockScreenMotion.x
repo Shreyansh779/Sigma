@@ -3,6 +3,8 @@
 // local video through MPMediaItemAnimatedArtwork under one of two now playing keys, 1:1 or 3:4, of those
 // the system lists. It rides on Spotify's now playing info as an extra (Shared/Player/NowPlayingExtras.h).
 //
+// The clip itself is fetched and cut Sigma's way (Shared/LockScreenArtwork/), Vitrine's follower deciding when.
+//
 // The system turns down a clip of another shape than its key's, and a preview still of another shape with
 // it, so a clip that does not fit (a Canvas is mostly 9:16) is cut to the key's shape about its middle, and
 // the still is filled to the size the system asks for. The cut, like the cover's clip, is made only when the
@@ -17,6 +19,9 @@
 #import "AnimatedArtwork.h"
 #import "SGFluidClip.h"
 #import "SGMotionClip.h"
+#import "Shared/LockScreenArtwork/SGAppleArtwork.h"
+#import "Shared/LockScreenArtwork/SGArtworkFile.h"
+#import "Shared/LockScreenArtwork/SGCanvas.h"
 #import "Shared/LockScreenLyrics/SGLyricsClip.h"
 #import "Shared/Player/NowPlayingExtras.h"
 #import "Shared/Player/PlayerState.h"
@@ -100,6 +105,76 @@ static void show(NSURL *file) {
     });
 }
 
+// Sigma's own way to a clip (LockScreenArtwork/): the Canvas or Apple Music's cover downloaded under its own name
+// and cut once to the key's shape (3:4 where the system lists it, else 1:1), so the file handed to the system fits
+// as it is. The sources are asked in the order SGMotionSourceOrder keeps, the keys MotionSources.m gives them.
+static NSString *const kCanvasSource = @"canvas";
+
+// `done` on the main queue with the clip ready, or nil.
+static void ready(NSString *identifier, NSString *address, CGFloat aspect, NSUInteger walk, void (^done)(NSURL *file)) {
+    void (^finish)(NSURL *) = ^(NSURL *file) {
+        dispatch_async(dispatch_get_main_queue(), ^{
+            if (walk == sg_walk) done(file);
+        });
+    };
+    SGArtworkFetch(identifier, address, ^(NSURL *file, NSString *note) {
+        SGLog(@"lock motion: %@ %@", identifier, note);
+        if (!file) {
+            finish(nil);
+            return;
+        }
+        SGArtworkCrop(file, identifier, aspect, ^(NSURL *cropped, NSString *cropNote) {
+            SGLog(@"lock motion: %@ %@", identifier, cropNote);
+            finish(cropped);
+        });
+    });
+}
+
+static void walkSources(NSArray<NSString *> *order, NSUInteger at, NSString *uri, NSURL *canvas, NSString *artist, NSString *album,
+                        CGFloat aspect, NSUInteger walk, void (^done)(NSURL *file, NSString *source)) {
+    if (at >= order.count) {
+        done(nil, nil);
+        return;
+    }
+    NSString *source = order[at];
+    void (^next)(NSURL *) = ^(NSURL *file) {
+        if (walk != sg_walk) return;
+        if (file) done(file, source);
+        else walkSources(order, at + 1, uri, canvas, artist, album, aspect, walk, done);
+    };
+    void (^fromCanvas)(NSURL *) = ^(NSURL *address) {
+        if (walk != sg_walk) return;
+        if (!address) {
+            next(nil);
+            return;
+        }
+        ready([address.lastPathComponent stringByDeletingPathExtension], address.absoluteString, aspect, walk, next);
+    };
+    if ([source isEqualToString:kCanvasSource]) {
+        if (canvas) fromCanvas(canvas);
+        else SGMotionCanvasFromService(uri, fromCanvas);
+        return;
+    }
+    SGAppleArtworkFind(artist, album, aspect < 0.9, ^(SGCanvas *cover, NSString *note) {
+        if (walk != sg_walk) return;
+        SGLog(@"lock motion: Apple Music %@", cover ? @"has a cover" : note);
+        if (cover.video) ready(cover.identifier, cover.address, aspect, walk, next);
+        else next(nil);
+    });
+}
+
+API_AVAILABLE(ios(26.0))
+static void sigmaClip(NSString *uri, NSURL *canvas, NSString *artist, NSString *album, void (^done)(NSURL *file, NSString *source)) {
+    NSArray<NSString *> *keys = MPNowPlayingInfoCenter.supportedAnimatedArtworkKeys;
+    BOOL tall = [keys containsObject:MPNowPlayingInfoProperty3x4AnimatedArtwork];
+    // Before MediaPlayer lists a key there is nothing to cut to: the next track asks again.
+    if (!tall && ![keys containsObject:MPNowPlayingInfoProperty1x1AnimatedArtwork]) {
+        done(nil, nil);
+        return;
+    }
+    walkSources(SGMotionSourceOrder(), 0, uri, canvas, artist, album, tall ? 0.75 : 1, sg_walk, done);
+}
+
 // The cover Spotify handed the system for `title`, read on the main thread as LyricsArtwork.x reads it,
 // then `then` on sg_queue with it, or with NULL when the info is another song's or has none.
 static void withCover(NSString *title, void (^then)(CGImageRef cover)) {
@@ -156,6 +231,7 @@ static void showCover(NSString *picture) {
         // Each walk takes the last one's clip off first, so the lock screen falls back to the still cover.
         sg_follower = [[SGMotionFollower alloc] initWithBegin:^BOOL(NSString *uri, SPTPlayerState *state) {
             sg_walk++;
+            SGArtworkCancelFetch();
             SGNowPlayingSetExtras(@"motion", nil, nil);
             NSDictionary *metadata = [state.track.metadata isKindOfClass:NSDictionary.class] ? state.track.metadata : nil;
             sg_title = state.track.trackTitle;
@@ -166,6 +242,9 @@ static void showCover(NSString *picture) {
             if (file) show(file);
             else if (sg_choice == SGLockArtworkEverySong) showCover(sg_picture);
         }];
+        sg_follower.clipFor = ^(NSString *uri, NSURL *canvas, NSString *artist, NSString *album, void (^done)(NSURL *file, NSString *source)) {
+            sigmaClip(uri, canvas, artist, album, done);
+        };
         // Heard on the writing thread and handed to main without waiting: a main-queue observer makes every
         // background defaults write wait for main, which deadlocks launch while main waits on Spotify's CoreThread.
         [NSNotificationCenter.defaultCenter addObserverForName:NSUserDefaultsDidChangeNotification object:nil queue:nil

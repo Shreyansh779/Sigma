@@ -48,17 +48,20 @@
     if (!_walked) return;
     NSDictionary *metadata = [state.track.metadata isKindOfClass:NSDictionary.class] ? state.track.metadata : nil;
     __weak SGMotionFollower *weakSelf = self;
-    SGMotionClipFor(uri, canvas, state.track.artistName, metadata[@"album_title"], SGMotionTall, SGMotionPixels(), ^(NSURL *file, NSString *source) {
+    void (^done)(NSURL *, NSString *) = ^(NSURL *file, NSString *source) {
         SGMotionFollower *follower = weakSelf;
         if (!follower || walk != follower->_walk) return;
         follower->_source = source;
         follower->_found(uri, file);
         [follower fetchAhead];
-    });
+    };
+    if (_clipFor) _clipFor(uri, canvas, state.track.artistName, metadata[@"album_title"], done);
+    else SGMotionClipFor(uri, canvas, state.track.artistName, metadata[@"album_title"], SGMotionTall, SGMotionPixels(), done);
 }
 
 // The next track's clip, fetched into the store once, so a skip finds it there.
 - (void)fetchAhead {
+    if (_clipFor) return;
     SPTPlayerState *state = SGPlayerState();
     id future = [state respondsToSelector:@selector(future)] ? state.future : nil;
     id next = [future isKindOfClass:NSArray.class] ? [(NSArray *)future firstObject] : nil;
