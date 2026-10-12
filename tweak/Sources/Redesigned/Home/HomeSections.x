@@ -174,13 +174,69 @@ static void dropDJHeading(UIView *content) {
     }
 }
 
+// A section knows its shelf before the shelf is measured: Spotify keeps an id on the section's content
+// (layoutSizeCacheElementID, a Swift String). One short enough to sit inline in the string's 16 bytes is the same string
+// every time, so the identity a shelf's heading gave once is kept under it (here and in the preferences): the next time
+// the section is sized, Home knows at once whether to drop it, without sizing it first or reading its heading. A longer
+// id holds a pointer, which is not the same twice, and is left out.
+static NSString *const kShelfIdsKey = @"spotifyglass.redesign.home.shelfIds";
+static const NSUInteger kShelfIdsMax = 400;
+
+static NSString *sectionKey(UIView *content) {
+    static Ivar ivar;
+    static BOOL looked;
+    if (!looked) {
+        looked = YES;
+        for (Class c = object_getClass(content); c && !ivar; c = class_getSuperclass(c)) ivar = class_getInstanceVariable(c, "layoutSizeCacheElementID");
+    }
+    if (!ivar) return nil;
+    const unsigned char *bytes = (const unsigned char *)(__bridge void *)content + ivar_getOffset(ivar);
+    static int logged;
+    if (SGDebugLog() && logged < 4) {
+        logged++;
+        NSMutableString *hex = [NSMutableString string];
+        for (int i = 0; i < 16; i++) [hex appendFormat:@"%02x", bytes[i]];
+        SGLog(@"home section id: %@ (%@)", hex, (bytes[15] & 0xF0) == 0xE0 ? @"inline" : @"pointer");
+    }
+    if ((bytes[15] & 0xF0) != 0xE0) return nil;
+    NSUInteger count = bytes[15] & 0x0F;
+    for (NSUInteger i = 0; i < count; i++) if (bytes[i] < 0x20 || bytes[i] > 0x7E) return nil;
+    return count ? [[NSString alloc] initWithBytes:bytes length:count encoding:NSASCIIStringEncoding] : nil;
+}
+
+static NSMutableDictionary<NSString *, NSString *> *shelfIds(void) {
+    static NSMutableDictionary *ids;
+    if (!ids) {
+        NSDictionary *stored = [NSUserDefaults.standardUserDefaults dictionaryForKey:kShelfIdsKey];
+        ids = [NSMutableDictionary dictionary];
+        for (NSString *key in stored) if ([key isKindOfClass:NSString.class] && [stored[key] isKindOfClass:NSString.class]) ids[key] = stored[key];
+    }
+    return ids;
+}
+
+static void learnShelf(NSString *key, NSString *identity) {
+    NSMutableDictionary<NSString *, NSString *> *ids = shelfIds();
+    if ([ids[key] isEqualToString:identity]) return;
+    if (!ids[key] && ids.count >= kShelfIdsMax) [ids removeAllObjects];
+    ids[key] = identity;
+    [NSUserDefaults.standardUserDefaults setObject:ids forKey:kShelfIdsKey];
+}
+
 static SGRHomeKind kindOf(UIView *content, NSString **rootName) {
     UIView *root = content.subviews.firstObject.subviews.firstObject;
     if (!root) return SGRHomeKindPending;
     *rootName = NSStringFromClass(root.class);
     static Class shelf;
     if (!shelf) shelf = NSClassFromString(@"_TtC16Home_CarouselKit29TouchCancellingCollectionView");
-    if (shelf && [root isKindOfClass:shelf]) return shelfKind(root);
+    if (shelf && [root isKindOfClass:shelf]) {
+        if (!SGRHomeShelfFilterActive()) return SGRHomeKindKeep;
+        NSString *key = sectionKey(content), *known = key ? shelfIds()[key] : nil;
+        if (known) return SGRHomeShelfHidden(known) ? SGRHomeKindDrop : SGRHomeKindKeep;
+        SGRHomeKind kind = shelfKind(root);
+        NSString *identity = key ? SGRHomeShelfIdentity(root) : nil;
+        if (identity) learnShelf(key, identity);
+        return kind;
+    }
     if ([root isKindOfClass:UICollectionView.class]) return gridKind((UICollectionView *)root);
     if ([root isKindOfClass:UIStackView.class]) return stackKind((UIStackView *)root);
     return optionalKind(*rootName);
@@ -335,6 +391,19 @@ static void logModel(UICollectionViewCell *cell, UIView *content, NSString *kind
     if (objc_getAssociatedObject(self, &kCollapsedKey)) expand((UICollectionViewCell *)self);
 }
 %end
+
+// The heading of a shelf read: the identity kept under its section's id is brought into line with it, and the section
+// measured again when that changes whether it is dropped.
+void SGRHomeShelfRead(UIView *heading, NSString *identity) {
+    if (!identity.length || !SGRHomeShelfFilterActive()) return;
+    UIView *cell = nil;
+    for (UIView *v = heading; v; v = v.superview) if ([v isKindOfClass:UICollectionViewCell.class]) cell = v;
+    NSString *key = cell ? sectionKey(((UICollectionViewCell *)cell).contentView) : nil;
+    NSString *known = key ? shelfIds()[key] : nil;
+    if (!key || [known isEqualToString:identity]) return;
+    learnShelf(key, identity);
+    if (known && SGRHomeShelfHidden(known) != SGRHomeShelfHidden(identity)) SGRHomeMeasureAgain(heading);
+}
 
 BOOL SGRHomeSectionCollapsed(UIView *cell) {
     return objc_getAssociatedObject(cell, &kCollapsedKey) != nil;
