@@ -2,8 +2,9 @@
 // spotify.casita.v1.resolved.ResolvedHome protobuf) names every section in its first field: one entry each with the
 // section's id ("spotify:section:...|new-releases-carousel") and a heading with the shelf's title, plain ("Recents")
 // or with a template over a name ("For fans of {0}" over "Metro Boomin", which the view knows as "For fans of ...").
-// The redesign's own cuts go the same way: a section of the kind of episodes (4) and of videos (25), which the redesign
-// drops from Home anyway (the videos unless its preview switch is on), are cut here and never made.
+// The redesign's own cuts go the same way: a section of the kind of episodes (4), of videos (25) and of preview
+// playlists (6, built as Discovery_MediumDensityCardKit cards: the log set the feed's sections beside the view's), which
+// the redesign drops from Home anyway (the last two unless its preview switch is on), are cut here and never made.
 // A shelf switched off is cut out of that list as the response arrives, so the page never makes a cell for it, never
 // sizes it, and leaves no gap or jump. Everything else in the body goes through byte for byte, and any body that does
 // not parse as expected goes through whole. HomeSections.x still drops what a section of the feed was not cut.
@@ -181,7 +182,7 @@ static NSData *withoutHiddenShelves(NSData *body) {
             sections++;
             NSString *identity = sectionIdentity(b, pl, ph);
             uint32_t kind = sectionKind(b, pl, ph);
-            BOOL drop = (identity.length && SGRHomeShelfHidden(identity)) || kind == 4 || (kind == 25 && !previews);
+            BOOL drop = (identity.length && SGRHomeShelfHidden(identity)) || kind == 4 || ((kind == 25 || kind == 6) && !previews);
             if (listing) [listing addObject:[NSString stringWithFormat:@"%02lu kind %u %@ \"%@\"%@", (unsigned long)sections, kind, sectionSlug(b, pl, ph) ?: @"?", identity ?: @"", drop ? @" CUT" : @""]];
             if (drop) {
                 [cut addObject:identity.length ? identity : sectionSlug(b, pl, ph) ?: @"?"];
