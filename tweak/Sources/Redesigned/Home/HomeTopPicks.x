@@ -37,7 +37,8 @@ static UICollectionViewCompositionalLayoutSectionProvider wrapped(UICollectionVi
         sg_enlarging = layout && objc_getAssociatedObject(layout, &kLargeKey) != nil;
         sg_cardWidth = 0;
         NSCollectionLayoutSection *made = provider(section, environment);
-        if (layout && sg_cardWidth > 0) objc_setAssociatedObject(layout, &kWidthKey, @(sg_cardWidth), OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+        // Cleared when none was made: a shelf of small cards (Recents' 94pt) has none to draw large.
+        if (layout) objc_setAssociatedObject(layout, &kWidthKey, sg_cardWidth > 0 ? @(sg_cardWidth) : nil, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
         sg_enlarging = was;
         sg_cardWidth = wasWidth;
         return made;
@@ -96,12 +97,13 @@ static CGFloat growth(CGFloat width) {
     if (![NSStringFromClass(object_getClass(content)) containsString:@"Home_EvoPageImpl13HomeStructure"]) return result;
     UIView *root = content.subviews.firstObject;
     NSInteger index = attributes.indexPath.section * 10000 + attributes.indexPath.item;
-    if (!shelf || ![root isKindOfClass:shelf] || result.size.height <= kHeading) {
+    UICollectionViewLayout *layout = shelf && [root isKindOfClass:shelf] ? ((UICollectionView *)root).collectionViewLayout : nil;
+    // A shelf whose layout has made no card kSmallest wide is not a candidate: the top is the first one that has.
+    if (!layout || result.size.height <= kHeading || !objc_getAssociatedObject(layout, &kWidthKey)) {
         // The top's place holds something else now (the feed came again): the next shelf measured takes it.
         if (index == sg_topIndex) sg_topIndex = NSIntegerMax;
         return result;
     }
-    UICollectionViewLayout *layout = ((UICollectionView *)root).collectionViewLayout;
     if (index < sg_topIndex) sg_topIndex = index;
     BOOL large = index == sg_topIndex, was = objc_getAssociatedObject(layout, &kLargeKey) != nil;
     // The shelf's height as Spotify sizes it, from a measuring before it was large.
