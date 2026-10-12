@@ -158,6 +158,11 @@ static BOOL isHomeTab(UIViewController *page) {
 %hook _TtC16Home_EvoPageImpl33EvoLoadableResourceViewController
 - (void)viewDidLayoutSubviews {
     %orig;
+    // A normal build with Debug log on samples the stalls of the first minutes too, and nothing else: the scroll meter
+    // below holds a 120 Hz display link while it scrolls, which a normal build does not, so it would change what it
+    // measures (Home lagged in a normal build and not in a FLEX one).
+    static dispatch_once_t plain;
+    if (!probing() && SGDebugLog()) dispatch_once(&plain, ^{ SGHangSamplerStart(@"after launch", 180); });
     if (!probing() || sg_list) return;
     UIViewController *page = (UIViewController *)self;
     if (!isHomeTab(page)) return;
