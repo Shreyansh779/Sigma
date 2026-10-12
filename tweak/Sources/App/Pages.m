@@ -16,7 +16,6 @@
 #import "Redesigned/NowPlayingBar/NowPlayingBar.h"
 #import "Redesigned/Kit/SGRAccent.h"
 #import "Redesigned/Player/Player.h"
-#import "Redesigned/Home/Home.h"
 #import "Shared/Fonts/Fonts.h"
 #import "Shared/Gestures/Gestures.h"
 #import "Shared/LyricsTranslation/LyricsTranslation.h"
