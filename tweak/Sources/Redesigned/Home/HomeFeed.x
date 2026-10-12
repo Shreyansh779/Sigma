@@ -2,12 +2,14 @@
 // spotify.casita.v1.resolved.ResolvedHome protobuf) names every section in its first field: one entry each with the
 // section's id ("spotify:section:...|new-releases-carousel") and a heading with the shelf's title, plain ("Recents")
 // or with a template over a name ("For fans of {0}" over "Metro Boomin", which the view knows as "For fans of ...").
+// The redesign's own cuts go the same way: a section of the kind of episodes (4) and of videos (25), which the redesign
+// drops from Home anyway (the videos unless its preview switch is on), are cut here and never made.
 // A shelf switched off is cut out of that list as the response arrives, so the page never makes a cell for it, never
 // sizes it, and leaves no gap or jump. Everything else in the body goes through byte for byte, and any body that does
 // not parse as expected goes through whole. HomeSections.x still drops what a section of the feed was not cut.
 //
 // The body is held until the request ends and then handed to Spotify's delegate in one piece, as the lyrics page does
-// (Shared/LyricsSources/LyricsHook.x). Only while a shelf is switched off (SGRHomeShelfFilterActive).
+// (Shared/LyricsSources/LyricsHook.x).
 #import <objc/runtime.h>
 #import "Core/SGCore.h"
 #import "Home.h"
@@ -118,6 +120,31 @@ static NSString *sectionIdentity(const uint8_t *b, NSUInteger lo, NSUInteger hi)
     return [identity stringByTrimmingCharactersInSet:NSCharacterSet.whitespaceCharacterSet];
 }
 
+// What kind of section it is: the number of its own field (shelves of cards 3, episodes 4, tracks 6, Recents 10, videos
+// 25, the shortcuts 2); 0 when it has none.
+static uint32_t sectionKind(const uint8_t *b, NSUInteger lo, NSUInteger hi) {
+    __block uint32_t kind = 0;
+    eachField(b, lo, hi, ^BOOL(uint32_t field, int wire, NSUInteger start, NSUInteger pl, NSUInteger ph, NSUInteger end) {
+        if (field == 1 || wire != 2) return YES;
+        kind = field;
+        return NO;
+    });
+    return kind;
+}
+
+static NSString *sectionSlug(const uint8_t *b, NSUInteger lo, NSUInteger hi) {
+    __block NSString *slug = nil;
+    eachField(b, lo, hi, ^BOOL(uint32_t field, int wire, NSUInteger start, NSUInteger pl, NSUInteger ph, NSUInteger end) {
+        NSUInteger tl, th;
+        if (field != 1 || wire != 2 || !firstBytes(b, pl, ph, 1, &tl, &th)) return YES;
+        NSString *text = textAt(b, tl, th);
+        NSRange bar = [text rangeOfString:@"|" options:NSBackwardsSearch];
+        slug = bar.location == NSNotFound ? text : [text substringFromIndex:NSMaxRange(bar)];
+        return NO;
+    });
+    return slug;
+}
+
 static void appendVarint(NSMutableData *out, uint64_t value) {
     do {
         uint8_t c = value & 0x7F;
@@ -146,19 +173,31 @@ static NSData *withoutHiddenShelves(NSData *body) {
 
     NSMutableData *kept = [NSMutableData data];
     NSMutableArray<NSString *> *cut = [NSMutableArray array];
+    NSMutableArray<NSString *> *listing = SGDebugLog() ? [NSMutableArray array] : nil;
+    BOOL previews = SGHidden(SGRKeyHomePreviews);
     __block NSUInteger sections = 0;
     ok = eachField(b, structureLo, structureHi, ^BOOL(uint32_t field, int wire, NSUInteger start, NSUInteger pl, NSUInteger ph, NSUInteger end) {
         if (field == 1 && wire == 2) {
             sections++;
             NSString *identity = sectionIdentity(b, pl, ph);
-            if (identity.length && SGRHomeShelfHidden(identity)) {
-                [cut addObject:identity];
+            uint32_t kind = sectionKind(b, pl, ph);
+            BOOL drop = (identity.length && SGRHomeShelfHidden(identity)) || kind == 4 || (kind == 25 && !previews);
+            if (listing) [listing addObject:[NSString stringWithFormat:@"%02lu kind %u %@ \"%@\"%@", (unsigned long)sections, kind, sectionSlug(b, pl, ph) ?: @"?", identity ?: @"", drop ? @" CUT" : @""]];
+            if (drop) {
+                [cut addObject:identity.length ? identity : sectionSlug(b, pl, ph) ?: @"?"];
                 return YES;
             }
         }
         [kept appendBytes:b + start length:end - start];
         return YES;
     });
+    static int listed;
+    if (SGDebugLog() && listed < 6) {
+        listed++;
+        SGLog(@"redesign home feed sections:
+%@", [listing componentsJoinedByString:@"
+"]);
+    }
     if (!ok || !cut.count) return nil;
 
     NSMutableData *out = [NSMutableData dataWithCapacity:length];
@@ -180,7 +219,7 @@ static SGRFeedState *stateOf(NSURLSessionTask *task) {
 }
 
 static void startFeed(NSURLSessionTask *task, NSURLResponse *response) {
-    if (stateOf(task) || !SGRHomeShelfFilterActive()) return;
+    if (stateOf(task)) return;
     NSURL *url = task.currentRequest.URL ?: task.originalRequest.URL;
     NSHTTPURLResponse *http = [response isKindOfClass:NSHTTPURLResponse.class] ? (NSHTTPURLResponse *)response : nil;
     if (!http || http.statusCode != 200 || ![url.path hasPrefix:@"/casita/v1/home/"]) return;
@@ -256,6 +295,6 @@ static void finished(id delegate, NSURLSession *session, NSURLSessionTask *task,
 %end
 
 %ctor {
-    if (!SGRedesignedUI() || !SGRHomeShelfFilterActive()) return;
+    if (!SGRedesignedUI()) return;
     %init;
 }

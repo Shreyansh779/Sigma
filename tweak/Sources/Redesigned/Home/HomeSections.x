@@ -170,6 +170,16 @@ static void dropDJHeading(UIView *content) {
     }
 }
 
+// Debug log only: each section of the page by its place in the list and what the view made of it, to be set beside the
+// feed's own listing (HomeFeed.x), in the same order.
+static void logSection(NSInteger section, NSString *root, SGRHomeKind kind) {
+    static NSMutableSet<NSNumber *> *logged;
+    if (!logged) logged = [NSMutableSet set];
+    if ([logged containsObject:@(section)] || logged.count > 80) return;
+    [logged addObject:@(section)];
+    SGLog(@"home view section %ld: %@ (%@)", (long)section, root ?: @"no root yet", kind == SGRHomeKindDrop ? @"dropped" : kind == SGRHomeKindKeep ? @"kept" : @"pending");
+}
+
 static SGRHomeKind kindOf(UIView *content, NSString **rootName) {
     UIView *root = content.subviews.firstObject.subviews.firstObject;
     if (!root) return SGRHomeKindPending;
@@ -280,6 +290,7 @@ static void logModel(UICollectionViewCell *cell, UIView *content, NSString *kind
     dropDJHeading(content);
     NSString *rootName = nil;
     SGRHomeKind kind = kindOf(content, &rootName);
+    if (SGDebugLog()) logSection(attributes.indexPath.section, rootName, kind);
     // A section to drop is not measured: Spotify builds and sizes a preview or a video in full (its players and covers),
     // which is the cost of scrolling past one, and the size is thrown away. Its cell is 0 tall from the start, so the
     // page does not jump back as the section collapses under the finger either.
