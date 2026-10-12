@@ -194,9 +194,7 @@ static NSData *withoutHiddenShelves(NSData *body) {
     static int listed;
     if (SGDebugLog() && listed < 6) {
         listed++;
-        SGLog(@"redesign home feed sections:
-%@", [listing componentsJoinedByString:@"
-"]);
+        SGLog(@"redesign home feed sections:\n%@", [listing componentsJoinedByString:@"\n"]);
     }
     if (!ok || !cut.count) return nil;
 
