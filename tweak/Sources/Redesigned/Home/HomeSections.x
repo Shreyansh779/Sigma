@@ -156,6 +156,7 @@ static SGRHomeKind stackKind(UIStackView *stack) {
 // A shelf stays unless its heading names one that is switched off; one with no heading to read yet stays, and
 // HomeHeadings.x asks the cell to measure again once there is one.
 static SGRHomeKind shelfKind(UIView *shelf) {
+    if (!SGRHomeShelfFilterActive()) return SGRHomeKindKeep;
     NSString *identity = SGRHomeShelfIdentity(shelf);
     if (!identity) return SGRHomeKindKeep;
     SGRHomeNoteShelf(identity);
@@ -281,12 +282,25 @@ static void logModel(UICollectionViewCell *cell, UIView *content, NSString *kind
     if (!isSection(content)) return %orig;
     CFTimeInterval began = SGRHomeProbeBegin();
     dropDJHeading(content);
+    NSString *rootName = nil;
+    SGRHomeKind kind = kindOf(content, &rootName);
+    // A section to drop is not measured: Spotify builds and sizes a preview or a video in full (its players and covers),
+    // which is the cost of scrolling past one, and the size is thrown away. Its cell is 0 tall from the start, so the
+    // page does not jump back as the section collapses under the finger either.
+    if (kind == SGRHomeKindDrop) {
+        UICollectionViewLayoutAttributes *dropped = [attributes copy];
+        collapse(cell, MAX(1, attributes.size.height));
+        dropped.size = CGSizeMake(attributes.size.width, 0);
+        markDropped(cell, attributes.indexPath.section, YES);
+        logOnce([@"dropped a section of " stringByAppendingString:rootName ?: @"no root"]);
+        SGRHomeProbeEnd(SGRHomeProbeSections, began);
+        return dropped;
+    }
     CFTimeInterval measuring = CACurrentMediaTime();
     UICollectionViewLayoutAttributes *result = %orig;
     measuring = CACurrentMediaTime() - measuring;
-
-    NSString *rootName = nil;
-    SGRHomeKind kind = kindOf(content, &rootName);
+    // Its root may only have come in while it was sized.
+    if (kind == SGRHomeKindPending) kind = kindOf(content, &rootName);
     BOOL collapsed = objc_getAssociatedObject(cell, &kCollapsedKey) != nil;
     if (kind == SGRHomeKindDrop) {
         collapse(cell, MAX(1, result.size.height));

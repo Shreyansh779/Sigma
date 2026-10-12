@@ -58,6 +58,7 @@ void SGRHomeNoteShelf(NSString *identity);         // seen on Home now
 NSArray<NSString *> *SGRHomeShelvesSeen(void);     // seen within 30 days, in the order first seen
 NSString *SGRHomeShelfHideKey(NSString *identity);
 BOOL SGRHomeShelfHidden(NSString *identity);
+BOOL SGRHomeShelfFilterActive(void);               // a shelf is hidden or Top picks names one: only then is a shelf's identity needed
 NSString *SGRHomeTopPicksFrom(void);               // the identity stored under SGRKeyHomeTopPicksFrom, nil for the first shelf
 
 // Whether HomeSections.x has collapsed the section in this cell.

@@ -137,6 +137,17 @@ BOOL SGRHomeLook(void) {
     return state == 1;
 }
 
+// Whether any shelf is hidden or Top picks is bound to one: read at launch, as the switches are. Without one, no shelf
+// need be told from another, so nothing reads a heading (which lays the shelf out) while Home sizes its sections.
+BOOL SGRHomeShelfFilterActive(void) {
+    static int state = -1;
+    if (state < 0) {
+        state = SGRHomeTopPicksFrom() != nil;
+        for (NSString *identity in SGRHomeShelvesSeen()) if (SGRHomeShelfHidden(identity)) state = 1;
+    }
+    return state == 1;
+}
+
 NSString *SGRHomeTopPicksFrom(void) {
     NSString *from = [NSUserDefaults.standardUserDefaults stringForKey:SGRKeyHomeTopPicksFrom];
     return from.length ? from : nil;
