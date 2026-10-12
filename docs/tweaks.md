@@ -276,7 +276,11 @@ Shared:
                   and kept per picture (SGFluidClip.m). Rendered on the Mac against harness/fluid-clip/. A track whose
                   metadata names no Canvas has it asked of Spotify's Canvas service (MotionSources.m); each track is
                   looked up again when its Canvas comes in a later state, and the next track's clip is fetched ahead
-                  (SGMotionFollower.m). The lock screen takes a clip under a key the system lists, cut to that key's
+                  (SGMotionFollower.m). The lock screen's clips are Sigma's own, fetched and cut by
+                  LockScreenArtwork/ (SGArtworkFile.m: kept in Caches, cut once to 3:4 or 1:1 so the file fits the
+                  key as it is; SGAppleArtwork.m: Apple Music's cover by the web player's own token and one catalog
+                  search), the follower only deciding when (its `clipFor`); the player's are SGMotionStore.m's. The
+                  lock screen takes a clip under a key the system lists, cut to that key's
                   shape when it is not, with its still filled to the size asked (SGMotionClip.m), and a change of the
                   choice applies at once, but to or from Lyrics. The cut and the service's wire format are checked on
                   the Mac against harness/motion/
