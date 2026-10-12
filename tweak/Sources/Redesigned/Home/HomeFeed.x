@@ -339,6 +339,8 @@ static void resetSavedFeed(void) {
 
 %ctor {
     if (!SGRedesignedUI()) return;
+    // Which build this is, for a log to say (the compile time of this file).
+    if (SGDebugLog()) SGLog(@"build: %s %s (feed filter cuts episodes, videos, previews)", __DATE__, __TIME__);
     resetSavedFeed();
     %init;
 }
