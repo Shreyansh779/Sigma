@@ -115,7 +115,8 @@ static void collapse(UICollectionViewCell *cell, CGFloat natural) {
     objc_setAssociatedObject(cell, &kCollapsedKey, @(natural), OBJC_ASSOCIATION_RETAIN_NONATOMIC);
     if (content.autoresizingMask & UIViewAutoresizingFlexibleHeight) content.autoresizingMask &= ~UIViewAutoresizingFlexibleHeight;
     CGRect frame = CGRectMake(0, 0, cell.bounds.size.width, natural);
-    if (!CGRectEqualToRect(content.frame, frame)) content.frame = frame;
+    // Not in an animation, as Player/PlayerCards.x.
+    if (!CGRectEqualToRect(content.frame, frame)) [UIView performWithoutAnimation:^{ content.frame = frame; }];
     if (!content.hidden) content.hidden = YES;
     if (!cell.clipsToBounds) cell.clipsToBounds = YES;
     cell.accessibilityElementsHidden = YES;
@@ -125,7 +126,7 @@ static void expand(UICollectionViewCell *cell) {
     UIView *content = cell.contentView;
     objc_setAssociatedObject(cell, &kCollapsedKey, nil, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
     content.autoresizingMask |= UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
-    content.frame = cell.bounds;
+    [UIView performWithoutAnimation:^{ content.frame = cell.bounds; }];
     content.hidden = NO;
     cell.clipsToBounds = NO;
     cell.accessibilityElementsHidden = NO;
