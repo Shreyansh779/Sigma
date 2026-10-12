@@ -388,7 +388,13 @@ static void logModel(UICollectionViewCell *cell, UIView *content, NSString *kind
     // A section to drop is not measured: Spotify builds and sizes a preview or a video in full (its players and covers),
     // which is the cost of scrolling past one, and the size is thrown away. Its cell is 0 tall from the start, so the
     // page does not jump back as the section collapses under the finger either.
-    if (kind == SGRHomeKindDrop) {
+    // A shelf is sized once by Spotify before it is left unsized: skipping its first sizing raised an exception in
+    // Spotify's own code (crash reports, 2026-10-12), which a preview or a video never did.
+    static NSMutableSet<NSString *> *sized;
+    if (!sized) sized = [NSMutableSet set];
+    NSString *shelfKey = [rootName containsString:@"TouchCancellingCollectionView"] ? sectionKey(content) : nil;
+    BOOL shelf = [rootName containsString:@"TouchCancellingCollectionView"];
+    if (kind == SGRHomeKindDrop && (!shelf || (shelfKey && [sized containsObject:shelfKey]))) {
         UICollectionViewLayoutAttributes *dropped = [attributes copy];
         collapse(cell, MAX(1, attributes.size.height));
         dropped.size = CGSizeMake(attributes.size.width, 0);
@@ -400,6 +406,7 @@ static void logModel(UICollectionViewCell *cell, UIView *content, NSString *kind
     CFTimeInterval measuring = CACurrentMediaTime();
     UICollectionViewLayoutAttributes *result = %orig;
     measuring = CACurrentMediaTime() - measuring;
+    if (shelfKey) [sized addObject:shelfKey];
     // Its root may only have come in while it was sized.
     if (kind == SGRHomeKindPending) kind = kindOf(content, &rootName);
     BOOL collapsed = objc_getAssociatedObject(cell, &kCollapsedKey) != nil;
