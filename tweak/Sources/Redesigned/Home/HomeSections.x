@@ -25,6 +25,7 @@
 // (the first, the shortcuts, has none). A dropped section is marked on the list's layout and asked for again
 // without that inset, so the list closes up around it with one 24pt gap, not two.
 #import <objc/runtime.h>
+#import <QuartzCore/QuartzCore.h>
 #import "Core/SGCore.h"
 #import "Redesigned/Kit/SGRKit.h"
 #import "Home.h"
@@ -234,6 +235,46 @@ static void expand(UICollectionViewCell *cell) {
     cell.accessibilityElementsHidden = NO;
 }
 
+// Debug log only: what a section's cell knows about its shelf before the heading is laid out, and what each measuring
+// costs, to find an identity that is there before Spotify measures (the plan for skipping hidden shelves' measure).
+// Once per class of cell content: its class, ivars and the accessibility strings of the cell, the content and the root;
+// then every measuring over 40 ms, up to 60 lines.
+static void logModel(UICollectionViewCell *cell, UIView *content, NSString *kind, NSString *rootName, CFTimeInterval spent) {
+    static NSMutableSet<NSString *> *classes;
+    static int slow;
+    if (!classes) classes = [NSMutableSet set];
+    UIView *root = content.subviews.firstObject.subviews.firstObject;
+    if (spent > 0.04 && slow < 60) {
+        slow++;
+        UIView *list = cell.superview;
+        while (list && ![list isKindOfClass:UICollectionView.class]) list = list.superview;
+        NSIndexPath *path = list ? [(UICollectionView *)list indexPathForCell:cell] : nil;
+        SGLog(@"home measure: %.0f ms, %@, root %@, section %ld", spent * 1000, kind, rootName ?: @"none", (long)(path ? path.section : -1));
+    }
+    NSString *name = NSStringFromClass(object_getClass(content));
+    if ([classes containsObject:name]) return;
+    [classes addObject:name];
+    NSMutableString *out = [NSMutableString stringWithFormat:@"home model: content %@; cell id \"%@\" label \"%@\"; content id \"%@\" label \"%@\"; root %@ id \"%@\" label \"%@\"",
+        name, cell.accessibilityIdentifier, cell.accessibilityLabel, content.accessibilityIdentifier, content.accessibilityLabel,
+        NSStringFromClass(object_getClass(root)), root.accessibilityIdentifier, root.accessibilityLabel];
+    for (Class c = object_getClass(content); c && c != UIView.class; c = class_getSuperclass(c)) {
+        unsigned int n = 0;
+        Ivar *ivars = class_copyIvarList(c, &n);
+        for (unsigned int i = 0; i < n; i++) {
+            const char *type = ivar_getTypeEncoding(ivars[i]);
+            NSString *value = @"";
+            if (type && type[0] == '@') {
+                id object = object_getIvar(content, ivars[i]);
+                value = object ? [NSString stringWithFormat:@" = %@", NSStringFromClass(object_getClass(object))] : @" = nil";
+            }
+            [out appendFormat:@"
+  %@.%s %s +%td%@", NSStringFromClass(c), ivar_getName(ivars[i]) ?: "?", type ?: "", ivar_getOffset(ivars[i]), value];
+        }
+        free(ivars);
+    }
+    SGLog(@"%@", out);
+}
+
 %hook _TtC12Element_List18CollectionViewCell
 - (UICollectionViewLayoutAttributes *)preferredLayoutAttributesFittingAttributes:(UICollectionViewLayoutAttributes *)attributes {
     UICollectionViewCell *cell = (UICollectionViewCell *)self;
@@ -241,7 +282,9 @@ static void expand(UICollectionViewCell *cell) {
     if (!isSection(content)) return %orig;
     CFTimeInterval began = SGRHomeProbeBegin();
     dropDJHeading(content);
+    CFTimeInterval measuring = CACurrentMediaTime();
     UICollectionViewLayoutAttributes *result = %orig;
+    measuring = CACurrentMediaTime() - measuring;
 
     NSString *rootName = nil;
     SGRHomeKind kind = kindOf(content, &rootName);
@@ -262,6 +305,7 @@ static void expand(UICollectionViewCell *cell) {
     } else {
         logOnce([@"sized a section before its root was in, left as it is: " stringByAppendingString:rootName ?: @"no root"]);
     }
+    if (SGDebugLog()) logModel(cell, content, kind == SGRHomeKindDrop ? @"dropped" : kind == SGRHomeKindKeep ? @"kept" : @"pending", rootName, measuring);
     SGRHomeProbeEnd(SGRHomeProbeSections, began);
     return result;
 }
