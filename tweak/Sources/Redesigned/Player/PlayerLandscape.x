@@ -1,7 +1,8 @@
 // Player redesign: the lyrics turn sideways with the phone onto a landscape screen of their own. The cover
 // is on the left with the title, the artist and the controls under it, and the lines are on the right.
 // The controls fade after a few seconds without a touch and come back at a tap, as in the player: the
-// tap that brings them back lands on a clear shield over the screen, so it never seeks. The button beside
+// tap that brings them back is watched by a recognizer over the screen that takes no touch from the lines,
+// so a finger is never stopped from scrolling them, and that tap never seeks. The button beside
 // the title turns the screen back to portrait, as VoiceOver's escape does, for a phone held flat or on its
 // side; the screen stays shut then until the phone has stood upright again.
 //
@@ -27,7 +28,7 @@ static BOOL sg_shut;
 
 #pragma mark - the screen
 
-@interface SGRLandscapeLyricsController : UIViewController <SGPlayerStateObserver>
+@interface SGRLandscapeLyricsController : UIViewController <SGPlayerStateObserver, UIGestureRecognizerDelegate>
 @end
 
 @implementation SGRLandscapeLyricsController {
@@ -40,7 +41,7 @@ static BOOL sg_shut;
     SGRKaraokeView *_lyrics;
     NSTimer *_rest;
     UITapGestureRecognizer *_hide;   // only while the controls are up
-    UIView *_shield;                 // only while they are not: the touch that brings them back
+    UITapGestureRecognizer *_wake;   // only while they are not: the tap that brings them back
 }
 
 // Portrait once the screen is on its way out, or the scene could not turn back while it fades.
@@ -133,16 +134,17 @@ static UIButton *controlButton(NSString *symbol, CGFloat size, NSString *label, 
 
     _hide = [[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(rest)];
     [self.view addGestureRecognizer:_hide];
-    _shield = [[UIView alloc] initWithFrame:self.view.bounds];
-    _shield.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
-    _shield.accessibilityElementsHidden = YES;
-    [_shield addGestureRecognizer:[[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(wake)]];
-    [_shield addGestureRecognizer:[[UIPanGestureRecognizer alloc] initWithTarget:self action:@selector(wake)]];
+    _wake = [[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(wake)];
+    _wake.delegate = self;
+    _wake.cancelsTouchesInView = NO;
+    _wake.delaysTouchesEnded = NO;
+    _wake.enabled = NO;
+    [self.view addGestureRecognizer:_wake];
     SGAddPlayerStateObserver(self);
     [self playerStateDidChange:SGPlayerState()];
     [NSNotificationCenter.defaultCenter addObserver:self selector:@selector(artworkChanged)
                                                name:SGRNowPlayingArtworkDidChangeNotification object:nil];
-    // The shield is hidden from VoiceOver, so turning it on brings the controls back and keeps them.
+    // VoiceOver keeps the controls up, so turning it on brings them back.
     [NSNotificationCenter.defaultCenter addObserver:self selector:@selector(wake)
                                                name:UIAccessibilityVoiceOverStatusDidChangeNotification object:nil];
 }
@@ -184,7 +186,8 @@ static UIButton *controlButton(NSString *symbol, CGFloat size, NSString *label, 
     UIWindow *window = self.view.window;
     if (!window || window != sg_window || size.width <= size.height) return;
     [coordinator animateAlongsideTransition:^(id<UIViewControllerTransitionCoordinatorContext> context) {
-        window.alpha = 1;
+        // Not a screen turned back since, which would be shown again while it fades out.
+        if (window == sg_window) window.alpha = 1;
     } completion:nil];
 }
 
@@ -210,7 +213,7 @@ static UIButton *controlButton(NSString *symbol, CGFloat size, NSString *label, 
     // A pause brings the controls back and keeps them; playing again, from here or anywhere, starts the
     // clock. The tap on the play button cannot: the state saying so arrives a beat after it.
     if (state.isPaused) [self setControlsShown:YES];
-    else if (!_rest && !_shield.superview) [self restartRest];
+    else if (!_rest && _hide.enabled) [self restartRest];
 }
 
 #pragma mark - controls
@@ -261,11 +264,8 @@ static UIButton *controlButton(NSString *symbol, CGFloat size, NSString *label, 
     [_rest invalidate];
     _rest = nil;
     _hide.enabled = shown;
-    if (shown) [_shield removeFromSuperview];
-    else if (!_shield.superview) {
-        _shield.frame = self.view.bounds;
-        [self.view addSubview:_shield];
-    }
+    _wake.enabled = !shown;
+    [self letLinesSeek:shown];
     // Back at a tap with the Kit's layout spring, from where a fade out is; they go with the slow fade, as the
     // portrait player's do (PlayerLyrics.x).
     SGRAnimate(shown ? SGRMotionLayout : SGRMotionFade, ^{
@@ -273,6 +273,26 @@ static UIButton *controlButton(NSString *symbol, CGFloat size, NSString *label, 
         self->_lyrics.extrasHidden = !shown;
     }, nil);
     if (shown) [self restartRest];
+}
+
+// The lines' tap seeks, so it is off while the controls are. Back on a turn of the run loop later: the tap that
+// brought the controls back is still being handed round, and must not reach it.
+- (void)letLinesSeek:(BOOL)seek {
+    __weak SGRLandscapeLyricsController *weakSelf = self;
+    void (^apply)(void) = ^{
+        SGRLandscapeLyricsController *strongSelf = weakSelf;
+        if (!strongSelf || seek != strongSelf->_hide.enabled) return;   // the other way again since
+        for (UIGestureRecognizer *recognizer in strongSelf->_lyrics.gestureRecognizers) {
+            if ([recognizer isKindOfClass:UITapGestureRecognizer.class]) recognizer.enabled = seek;
+        }
+    };
+    if (seek) dispatch_async(dispatch_get_main_queue(), apply);
+    else apply();
+}
+
+// The wake takes nothing from the lines under it and lets every other recognizer have the same tap.
+- (BOOL)gestureRecognizer:(UIGestureRecognizer *)recognizer shouldRecognizeSimultaneouslyWithGestureRecognizer:(UIGestureRecognizer *)other {
+    return YES;
 }
 
 - (void)restartRest {
@@ -329,7 +349,7 @@ static void requestOrientations(UIWindowScene *scene, UIInterfaceOrientationMask
     }
 }
 
-void SGRPlayerShowLandscape(BOOL show) {
+static void turnLandscape(BOOL show, BOOL animated) {
     UIWindowScene *scene = (UIWindowScene *)UIApplication.sharedApplication.connectedScenes.anyObject;
     if (![scene isKindOfClass:UIWindowScene.class]) return;
     if (show && !sg_window) {
@@ -354,7 +374,7 @@ void SGRPlayerShowLandscape(BOOL show) {
         requestOrientations(scene, UIInterfaceOrientationMaskPortrait);
         // Faded out as the scene turns back; the player is key again once it is gone, unless the lines came
         // back meanwhile.
-        SGRAnimate(SGRMotionFade, ^{ window.alpha = 0; }, ^(BOOL finished) {
+        void (^gone)(void) = ^{
             window.hidden = YES;
             if (sg_window) return;
             for (UIWindow *other in scene.windows) {
@@ -363,12 +383,25 @@ void SGRPlayerShowLandscape(BOOL show) {
                     break;
                 }
             }
-        });
-        SGLog(@"redesign player: the lyrics turn back");
+        };
+        if (animated) SGRAnimate(SGRMotionFade, ^{ window.alpha = 0; }, ^(BOOL finished) { gone(); });
+        else {
+            window.alpha = 0;
+            gone();
+        }
+        SGLog(@"redesign player: the lyrics turn back%@", animated ? @"" : @" at once");
     }
 }
 
+void SGRPlayerShowLandscape(BOOL show) {
+    turnLandscape(show, YES);
+}
+
+// Not while the app is not in front: coming back from another app the phone reports orientations that are not
+// where it ended up (a screen made and put away within 15 ms of one is in a recorded log, the last lines of it),
+// and the scene is not ours to turn then. The orientation is read again when the app is active.
 static void orientationChanged(void) {
+    if (UIApplication.sharedApplication.applicationState != UIApplicationStateActive) return;
     UIDeviceOrientation orientation = UIDevice.currentDevice.orientation;
     if (UIDeviceOrientationIsLandscape(orientation)) {
         if (!sg_shut && SGEnabled(SGRKeyLyricsLandscape) && SGRPlayerLyricsOpen()) SGRPlayerShowLandscape(YES);
@@ -384,5 +417,11 @@ static void orientationChanged(void) {
         [UIDevice.currentDevice beginGeneratingDeviceOrientationNotifications];
         [NSNotificationCenter.defaultCenter addObserverForName:UIDeviceOrientationDidChangeNotification object:nil queue:nil
                                                     usingBlock:^(NSNotification *note) { orientationChanged(); }];
+        [NSNotificationCenter.defaultCenter addObserverForName:UIApplicationDidBecomeActiveNotification object:nil queue:nil
+                                                    usingBlock:^(NSNotification *note) { orientationChanged(); }];
+        // Another app's card is portrait: the screen is put away before the scene is snapshotted and turned, and
+        // comes back with the phone when the app is active again.
+        [NSNotificationCenter.defaultCenter addObserverForName:UIApplicationDidEnterBackgroundNotification object:nil queue:nil
+                                                    usingBlock:^(NSNotification *note) { turnLandscape(NO, NO); }];
     });
 }
