@@ -292,7 +292,45 @@ static void finished(id delegate, NSURLSession *session, NSURLSessionTask *task,
 }
 %end
 
+#pragma mark - Spotify's saved copy of the feed
+
+// Spotify shows its saved copy of Home first and refreshes it in the background (a stale response policy), and the copy
+// it saved is the one it was handed: with shelves cut. A shelf switched on again would stay out until the copy was
+// replaced, and the Home look that waits on a shelf (Top picks) with it. So when what is cut changes, what the app
+// keeps of the feed under Library/Caches goes (a cache is made again as needed), and the Debug log lists what was there.
+static NSString *const kFeedSignatureKey = @"spotifyglass.redesign.home.feedSignature";
+
+static NSString *cutSignature(void) {
+    NSMutableArray<NSString *> *hidden = [NSMutableArray array];
+    for (NSString *identity in SGRHomeShelvesSeen()) if (SGRHomeShelfHidden(identity)) [hidden addObject:identity];
+    [hidden sortUsingSelector:@selector(compare:)];
+    return [NSString stringWithFormat:@"%@|previews %d", [hidden componentsJoinedByString:@"; "], SGHidden(SGRKeyHomePreviews)];
+}
+
+static void resetSavedFeed(void) {
+    NSString *signature = cutSignature(), *was = [NSUserDefaults.standardUserDefaults stringForKey:kFeedSignatureKey];
+    BOOL changed = ![signature isEqualToString:was];
+    NSFileManager *files = NSFileManager.defaultManager;
+    NSString *caches = NSSearchPathForDirectoriesInDomains(NSCachesDirectory, NSUserDomainMask, YES).firstObject;
+    NSMutableArray<NSString *> *listing = [NSMutableArray array];
+    for (NSString *name in [files contentsOfDirectoryAtPath:caches error:nil]) {
+        NSString *lower = name.lowercaseString;
+        if (![lower containsString:@"home"] && ![lower containsString:@"evo"] && ![lower containsString:@"casita"]) continue;
+        NSString *path = [caches stringByAppendingPathComponent:name];
+        unsigned long long size = [[files attributesOfItemAtPath:path error:nil] fileSize];
+        [listing addObject:[NSString stringWithFormat:@"%@ (%llu bytes)", name, size]];
+        if (changed) [files removeItemAtPath:path error:nil];
+    }
+    if (changed) {
+        [NSURLCache.sharedURLCache removeAllCachedResponses];
+        [NSUserDefaults.standardUserDefaults setObject:signature forKey:kFeedSignatureKey];
+    }
+    if (SGDebugLog()) SGLog(@"redesign home feed: what is cut %@, saved copies %@: %@", changed ? @"changed, they are removed" : @"is as it was",
+                            listing.count ? @"in Library/Caches" : @"none found in Library/Caches", [listing componentsJoinedByString:@", "]);
+}
+
 %ctor {
     if (!SGRedesignedUI()) return;
+    resetSavedFeed();
     %init;
 }
