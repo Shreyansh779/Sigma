@@ -63,7 +63,7 @@ SGModRow *SGRedesignedUIRow(void) {
 // leads Mod Settings' main page.
 UIViewController *SGAppearancePage(void) {
     return [[SGModPage alloc] initWithTitle:@"Appearance" intro:SGRestartNote sections:@[
-        SGSection(nil, SGRedesignedUIStored() ? [SGRAppearanceRows() arrayByAddingObject:SGRHomeTopPicksRow()] : SGNativeAppearanceRows()),
+        SGSection(nil, SGRedesignedUIStored() ? SGRAppearanceRows() : SGNativeAppearanceRows()),
         SGSection(nil, SGAppFontRows()),
     ] footer:nil];
 }

@@ -27,6 +27,12 @@ SGModRow *SGHideRow(NSString *title, NSString *subtitle, NSString *key) {
     return row;
 }
 
+SGModRow *SGShownRow(NSString *title, NSString *subtitle, NSString *hideKey) {
+    SGModRow *row = SGHideRow(title, subtitle, hideKey);
+    row.inverted = YES;
+    return row;
+}
+
 // A switch for something the mod adds rather than takes away: off until it is asked for.
 SGModRow *SGOptionRow(NSString *title, NSString *subtitle, NSString *key) {
     SGModRow *row = SGSwitchRow(title, subtitle, key);
@@ -887,7 +893,7 @@ static void showWaiting(UITableViewCell *cell, BOOL waiting, NSString *switchTit
         BOOL beats = NO;
         if (locked) SGLockedFlagValue(row.key, &beats);
         BOOL showsLock = locked && (beats || !SGFlagOverride(row.key));
-        BOOL on = row.flag ? (showsLock ? lockedRowOn(row) : flagRowOn(row)) : SGFlag(row.key, row.defaultOn);
+        BOOL on = row.flag ? (showsLock ? lockedRowOn(row) : flagRowOn(row)) : SGFlag(row.key, row.defaultOn) != row.inverted;
         UIControl *toggle;
         if (row.glows) {
             SGGlowSwitch *glow = [SGGlowSwitch new];
@@ -1010,7 +1016,7 @@ static void showWaiting(UITableViewCell *cell, BOOL waiting, NSString *switchTit
     if (!path) return;
     SGModRow *row = [self rowAt:path];
     if (row.flag) SGSetFlagOverride(row.key, on ? @(!row.forceOff) : nil);
-    else SGSetEnabled(row.key, on);
+    else SGSetEnabled(row.key, on != row.inverted);
     if (row.changed) row.changed(on);
     // A glowing switch is let finish its slide before the reload puts a new one in its place; rows coming
     // or going are let finish first too.

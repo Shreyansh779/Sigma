@@ -18,6 +18,7 @@
 #import "Settings/SGModPage.h"
 #import "Native/Home/Home.h"
 #import "Redesigned/Album/Album.h"
+#import "Redesigned/Home/Home.h"
 #import "Shared/Sing/Sing.h"
 #import "Shared/HeadGestures/HeadGestures.h"
 #import "Shared/LiveActivity/LiveActivity.h"
@@ -62,10 +63,13 @@ static UIViewController *modSettingsPage(void) {
     albums.visible = redesigned;
     SGModRow *home = pageRow(@"Home & Library", @"house", UIColor.systemCyanColor, ^UIViewController *{ return SGHomeSettingsPage(); });
     home.visible = native;
+    SGModRow *redesignedHome = pageRow(@"Home", @"house.fill", UIColor.systemCyanColor, ^UIViewController *{ return SGRHomeSettingsPage(); });
+    redesignedHome.visible = redesigned;
     [sections addObject:SGSection(nil, @[
         pageRow(@"Player", @"play.circle", UIColor.systemPinkColor, ^UIViewController *{ return SGPlayerSettingsPage(); }),
         pageRow(@"Lyrics", @"quote.bubble", UIColor.systemPurpleColor, ^UIViewController *{ return SGLyricsSettingsPage(); }),
         albums,
+        redesignedHome,
         home,
     ])];
 
