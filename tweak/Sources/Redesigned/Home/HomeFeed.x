@@ -175,6 +175,7 @@ static NSData *withoutHiddenShelves(NSData *body) {
     NSMutableData *kept = [NSMutableData data];
     NSMutableArray<NSString *> *cut = [NSMutableArray array];
     NSMutableArray<NSString *> *listing = SGDebugLog() ? [NSMutableArray array] : nil;
+    NSMutableArray<NSString *> *named = [NSMutableArray array];
     BOOL previews = SGHidden(SGRKeyHomePreviews);
     __block NSUInteger sections = 0;
     ok = eachField(b, structureLo, structureHi, ^BOOL(uint32_t field, int wire, NSUInteger start, NSUInteger pl, NSUInteger ph, NSUInteger end) {
@@ -182,6 +183,7 @@ static NSData *withoutHiddenShelves(NSData *body) {
             sections++;
             NSString *identity = sectionIdentity(b, pl, ph);
             uint32_t kind = sectionKind(b, pl, ph);
+            if (identity.length) [named addObject:identity];
             BOOL drop = (identity.length && SGRHomeShelfHidden(identity)) || kind == 4 || ((kind == 25 || kind == 6) && !previews);
             if (listing) [listing addObject:[NSString stringWithFormat:@"%02lu kind %u %@ \"%@\"%@", (unsigned long)sections, kind, sectionSlug(b, pl, ph) ?: @"?", identity ?: @"", drop ? @" CUT" : @""]];
             if (drop) {
@@ -192,6 +194,11 @@ static NSData *withoutHiddenShelves(NSData *body) {
         [kept appendBytes:b + start length:end - start];
         return YES;
     });
+    // Every shelf the feed names is one the Home page of Mod Settings lists, cut or not: a shelf is cut before it is ever
+    // made, so nothing else would keep it listed (it drops off after 30 days unseen) to be switched on again.
+    if (ok && named.count) {
+        dispatch_async(dispatch_get_main_queue(), ^{ for (NSString *identity in named) SGRHomeNoteShelf(identity); });
+    }
     static int listed;
     if (SGDebugLog() && listed < 6) {
         listed++;
