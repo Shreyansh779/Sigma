@@ -309,7 +309,7 @@ static void topLost(UICollectionView *list) {
     }
     UICollectionViewLayout *layout = ((UICollectionView *)root).collectionViewLayout;
     // The shelf drawn large: the one Cards from names, else the one nearest the top; never one switched off.
-    NSString *identity = SGRHomeShelfIdentity(root), *from = SGRHomeTopPicksFrom();
+    NSString *identity = SGRHomeShelfFilterActive() ? SGRHomeShelfIdentity(root) : nil, *from = SGRHomeTopPicksFrom();
     BOOL candidate = !SGRHomeShelfHidden(identity) && (!from || [identity isEqualToString:from]);
     if (candidate && index < sg_topIndex) sg_topIndex = index;
     else if (!candidate && index == sg_topIndex) topLost((UICollectionView *)list);
