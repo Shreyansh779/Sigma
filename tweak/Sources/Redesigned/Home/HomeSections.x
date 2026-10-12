@@ -26,6 +26,8 @@
 // without that inset, so the list closes up around it with one 24pt gap, not two.
 #import <objc/runtime.h>
 #import <QuartzCore/QuartzCore.h>
+#import <malloc/malloc.h>
+#import <mach/mach.h>
 #import "Core/SGCore.h"
 #import "Redesigned/Kit/SGRKit.h"
 #import "Home.h"
@@ -174,34 +176,77 @@ static void dropDJHeading(UIView *content) {
     }
 }
 
-// A section knows its shelf before the shelf is measured: Spotify keeps an id on the section's content
-// (layoutSizeCacheElementID, a Swift String). One short enough to sit inline in the string's 16 bytes is the same string
-// every time, so the identity a shelf's heading gave once is kept under it (here and in the preferences): the next time
-// the section is sized, Home knows at once whether to drop it, without sizing it first or reading its heading. A longer
-// id holds a pointer, which is not the same twice, and is left out.
+// A section knows its shelf before the shelf is measured: the cell's content holds the shelf's data (an object of
+// Home_EvoPageImpl.HomeStructure, ShelfData and its kin, from Spotify's feed), which carries the section's id. The id
+// is a Swift String, read here byte by byte; the identity a shelf's heading gave once is kept under it (here and in
+// the preferences), and the next time the section is sized Home knows at once whether to drop it, without sizing it
+// first or reading its heading. Anything that does not look as expected gives nil and the old way.
 static NSString *const kShelfIdsKey = @"spotifyglass.redesign.home.shelfIds";
 static const NSUInteger kShelfIdsMax = 400;
 
+// The text of the Swift String at `at`: inline when it is short, else in the object the string points to.
+static NSString *swiftString(const unsigned char *at) {
+    uint64_t count = 0, object = 0;
+    memcpy(&count, at, 8);
+    memcpy(&object, at + 8, 8);
+    unsigned char tag = (unsigned char)(object >> 56);
+    const unsigned char *bytes = NULL;
+    unsigned char buffer[160];
+    if ((tag & 0xF0) == 0xE0) {
+        count = tag & 0x0F;
+        bytes = at;
+    } else {
+        count &= 0x0000FFFFFFFFFFFFULL;
+        uint64_t address = object & 0x0FFFFFFFFFFFFFFFULL;
+        unsigned char kind = tag >> 4;
+        if (count == 0 || count >= sizeof buffer || address < 0x100000000ULL) return nil;
+        if (kind == 0x0) address += 32;       // native: the characters follow the object's header
+        else if (kind != 0x8) return nil;     // immortal (a literal) points at them
+        vm_size_t read = 0;
+        if (vm_read_overwrite(mach_task_self(), (vm_address_t)address, (vm_size_t)count, (vm_address_t)buffer, &read) != KERN_SUCCESS || read != count) return nil;
+        bytes = buffer;
+    }
+    if (count == 0 || count >= sizeof buffer) return nil;
+    for (uint64_t i = 0; i < count; i++) if (bytes[i] < 0x20 || bytes[i] > 0x7E) return nil;
+    return [[NSString alloc] initWithBytes:bytes length:(NSUInteger)count encoding:NSASCIIStringEncoding];
+}
+
 static NSString *sectionKey(UIView *content) {
-    static Ivar ivar;
+    static Ivar configuration, after;
     static BOOL looked;
     if (!looked) {
         looked = YES;
-        for (Class c = object_getClass(content); c && !ivar; c = class_getSuperclass(c)) ivar = class_getInstanceVariable(c, "layoutSizeCacheElementID");
+        for (Class c = object_getClass(content); c && !configuration; c = class_getSuperclass(c)) {
+            configuration = class_getInstanceVariable(c, "elementConfiguration");
+            after = class_getInstanceVariable(c, "elementView");
+        }
     }
-    if (!ivar) return nil;
-    const unsigned char *bytes = (const unsigned char *)(__bridge void *)content + ivar_getOffset(ivar);
-    static int logged;
-    if (SGDebugLog() && logged < 4) {
-        logged++;
-        NSMutableString *hex = [NSMutableString string];
-        for (int i = 0; i < 16; i++) [hex appendFormat:@"%02x", bytes[i]];
-        SGLog(@"home section id: %@ (%@)", hex, (bytes[15] & 0xF0) == 0xE0 ? @"inline" : @"pointer");
+    if (!configuration || !after) return nil;
+    ptrdiff_t from = ivar_getOffset(configuration), to = ivar_getOffset(after);
+    if (to <= from || to - from > 512) return nil;
+    const unsigned char *base = (const unsigned char *)(__bridge void *)content;
+    for (ptrdiff_t at = from; at + 8 <= to; at += 8) {
+        uint64_t word = 0;
+        memcpy(&word, base + at, 8);
+        uint64_t address = word & 0x00007FFFFFFFFFF8ULL;
+        if (address < 0x100000000ULL || malloc_size((const void *)address) == 0) continue;
+        Class cls = object_getClass((__bridge id)(const void *)address);
+        const char *name = cls ? class_getName(cls) : NULL;
+        if (!name || strncmp(name, "_TtCO16Home_EvoPageImpl13HomeStructure", 38) != 0) continue;
+        Ivar sectionID = class_getInstanceVariable(cls, "sectionID") ?: class_getInstanceVariable(cls, "sectionId");
+        if (!sectionID) continue;
+        NSString *key = swiftString((const unsigned char *)address + ivar_getOffset(sectionID));
+        static int logged;
+        if (SGDebugLog() && logged < 6) {
+            logged++;
+            Ivar heading = class_getInstanceVariable(cls, "heading");
+            NSMutableString *hex = [NSMutableString string];
+            if (heading && (size_t)ivar_getOffset(heading) + 32 <= malloc_size((const void *)address)) for (int i = 0; i < 32; i++) [hex appendFormat:@"%02x", ((const unsigned char *)address)[ivar_getOffset(heading) + i]];
+            SGLog(@"home section data: %s sectionID %@, heading bytes %@", name, key ?: @"(unreadable)", hex);
+        }
+        return key;
     }
-    if ((bytes[15] & 0xF0) != 0xE0) return nil;
-    NSUInteger count = bytes[15] & 0x0F;
-    for (NSUInteger i = 0; i < count; i++) if (bytes[i] < 0x20 || bytes[i] > 0x7E) return nil;
-    return count ? [[NSString alloc] initWithBytes:bytes length:count encoding:NSASCIIStringEncoding] : nil;
+    return nil;
 }
 
 static NSMutableDictionary<NSString *, NSString *> *shelfIds(void) {
