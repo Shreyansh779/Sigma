@@ -16,6 +16,7 @@ static Class sg_containerClass;
 static __weak UIScrollView *sg_page, *sg_other;
 static SGRMinimizeTrack sg_track;
 static BOOL sg_waitForTouch;
+static CGFloat sg_height;
 
 static BOOL inContainer(UIView *view) {
     for (UIResponder *r = view.nextResponder; r; r = r.nextResponder) if ([r isKindOfClass:sg_containerClass]) return YES;
@@ -32,6 +33,14 @@ static void scrolled(UIScrollView *scrollView) {
         }
         sg_page = scrollView;
         sg_track = (SGRMinimizeTrack){offset, SGRTabBarMinimized()};
+    }
+    // The page's content changed height under the finger (Home collapsing a hidden shelf, a feed filling in): the
+    // offset moved with it, which is not a scroll, so the track starts again from here rather than flip the bar.
+    CGFloat height = scrollView.contentSize.height;
+    if (height != sg_height) {
+        sg_height = height;
+        sg_track.turn = offset;
+        return;
     }
     // The bar changed some other way (a tab, the player): the scroll counts from here.
     if (sg_track.minimized != SGRTabBarMinimized()) {
