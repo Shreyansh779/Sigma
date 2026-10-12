@@ -41,7 +41,9 @@ typedef struct {
 // luminance keeping its hue, so a near-black cover cannot cost the tile the step of elevation it stands on,
 // nor sink it into the grey band SGRAmoled.x turns pure black. nil to the completion when the image has no
 // bitmap to read.
-+ (void)tintForImage:(UIImage *)image surface:(UIColor *)surface completion:(void (^)(UIColor *tint))completion;
+// `strong` NO is the faint tint (no saturation lift, 35% of the colour mixed in); YES the cover's colour at a luminance
+// of 0.04, as the Home look draws its tiles and cards.
++ (void)tintForImage:(UIImage *)image surface:(UIColor *)surface strong:(BOOL)strong completion:(void (^)(UIColor *tint))completion;
 @end
 
 // Any colour made fit to be a field, the same way the edge colour is: for a colour Spotify hands over

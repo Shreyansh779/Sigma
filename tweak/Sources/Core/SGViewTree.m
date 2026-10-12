@@ -5,6 +5,13 @@ void SGForEachView(UIView *view, void (^fn)(UIView *)) {
     for (UIView *sub in view.subviews) SGForEachView(sub, fn);
 }
 
+BOOL SGShownUnder(UIView *view, UIView *root) {
+    for (UIView *v = view; v && v != root; v = v.superview) {
+        if (v.hidden) return NO;
+    }
+    return YES;
+}
+
 CGRect SGFrameIn(UIView *view, UIView *target) {
     return [view.superview convertRect:view.frame toView:target];
 }

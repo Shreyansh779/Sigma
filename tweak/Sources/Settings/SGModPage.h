@@ -15,6 +15,8 @@
 @property (nonatomic) BOOL defaultOn;
 @property (nonatomic) BOOL flag;
 @property (nonatomic) BOOL forceOff;
+// The switch shows the opposite of what is stored under its key (SGShownRow).
+@property (nonatomic) BOOL inverted;
 @property (nonatomic, copy) UIViewController *(^page)(void);
 @property (nonatomic, copy) NSString *(^value)(void);
 @property (nonatomic, copy) void (^action)(void);
@@ -69,6 +71,9 @@ extern NSString *const SGRestartNote;
 
 SGModRow *SGSwitchRow(NSString *title, NSString *subtitle, NSString *key);   // on until switched off
 SGModRow *SGHideRow(NSString *title, NSString *subtitle, NSString *key);     // off until switched on
+// A part of Spotify the mod can take away, named for the part and shown on: turning it off stores YES under
+// `hideKey`, the way SGHideRow does, so a reset (stock) shows the part again.
+SGModRow *SGShownRow(NSString *title, NSString *subtitle, NSString *hideKey);
 // A switch for something the mod adds rather than takes away: off until it is asked for.
 SGModRow *SGOptionRow(NSString *title, NSString *subtitle, NSString *key);
 // A switch whose work is not finished: turning it on says so first, and offers the repo.

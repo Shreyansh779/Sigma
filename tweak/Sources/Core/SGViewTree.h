@@ -2,6 +2,8 @@
 #import <UIKit/UIKit.h>
 
 void SGForEachView(UIView *view, void (^fn)(UIView *));
+// Whether no view from `view` up to (not including) `root` is hidden.
+BOOL SGShownUnder(UIView *view, UIView *root);
 CGRect SGFrameIn(UIView *view, UIView *target);
 // Whether `view` sits under `root`, stopping at a visual effect view on the way up.
 BOOL SGIsInside(UIView *view, UIView *root);
