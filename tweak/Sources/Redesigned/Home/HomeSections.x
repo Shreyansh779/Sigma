@@ -267,8 +267,7 @@ static void logModel(UICollectionViewCell *cell, UIView *content, NSString *kind
                 id object = object_getIvar(content, ivars[i]);
                 value = object ? [NSString stringWithFormat:@" = %@", NSStringFromClass(object_getClass(object))] : @" = nil";
             }
-            [out appendFormat:@"
-  %@.%s %s +%td%@", NSStringFromClass(c), ivar_getName(ivars[i]) ?: "?", type ?: "", ivar_getOffset(ivars[i]), value];
+            [out appendFormat:@"\n  %@.%s %s +%td%@", NSStringFromClass(c), ivar_getName(ivars[i]) ?: "?", type ?: "", ivar_getOffset(ivars[i]), value];
         }
         free(ivars);
     }
