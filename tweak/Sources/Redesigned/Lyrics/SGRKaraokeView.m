@@ -1421,6 +1421,8 @@ typedef struct {
     _maxBlur = kMaxBlur * look.blur;
     sgr_glowScale = look.glow;
     sgr_waveScale = look.wave;
+    SGLog(@"lyrics look: %@ view takes %.0f pt, %.0f apart, blur %.1f, glow %.1f, wave %.1f (%@)", _sample ? @"the preview" : @"a lyrics", look.size, look.spacing,
+          look.blur, look.glow, look.wave, [NSUserDefaults.standardUserDefaults dictionaryForKey:SGRKeyLyricsLook] ? @"stored" : @"nothing stored, Apple Music's");
 }
 
 - (void)lookChanged {
@@ -1869,7 +1871,11 @@ static BOOL anyUntranslated(NSArray<SGKaraokeLine *> *lines) {
 // new ones crossfade over them where they were, so nothing blinks and nothing is lost of the place.
 - (void)restyle {
     [self offerExtras];
-    if (!_lines || !_tops || _builtWidth <= 0) return;   // the next build picks the style up
+    if (!_lines || !_tops || _builtWidth <= 0) {   // the next build picks the style up
+        SGLog(@"lyrics look: %@ view has nothing placed to restyle (lines %lu, width %.0f), the next build takes it", _sample ? @"the preview" : @"a lyrics",
+              (unsigned long)_lines.count, _builtWidth);
+        return;
+    }
     SGRKaraokeStyle *style = [self styleNow];
     NSArray<SGKaraokeLine *> *lines = _lines;
     CGFloat width = _builtWidth - 2 * _margin, gap = _lineGap;
