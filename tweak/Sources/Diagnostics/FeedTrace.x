@@ -46,6 +46,15 @@ static void noteResponse(NSURLSessionTask *task, NSURLResponse *response) {
             if (!sg_bodies) sg_bodies = [NSMapTable weakToStrongObjectsMapTable];
             [sg_bodies setObject:[NSMutableData data] forKey:task];
             SGLog(@"feed: casita response %@ headers %@", url.absoluteString, http.allHeaderFields);
+            // What the app sent, to set a launch the server answered with the big feed beside one it answered with the small
+            // one: the request's headers, the login values blanked.
+            NSMutableDictionary<NSString *, NSString *> *sent = [NSMutableDictionary dictionary];
+            for (NSString *name in (task.currentRequest ?: task.originalRequest).allHTTPHeaderFields) {
+                NSString *lower = name.lowercaseString, *value = (task.currentRequest ?: task.originalRequest).allHTTPHeaderFields[name];
+                BOOL secret = [lower containsString:@"authorization"] || [lower containsString:@"cookie"] || [lower containsString:@"token"];
+                sent[name] = secret ? [NSString stringWithFormat:@"<%lu characters>", (unsigned long)value.length] : value;
+            }
+            SGLog(@"feed: casita request %@ headers %@", task.originalRequest.HTTPMethod ?: @"GET", sent);
         }
     }
 }
@@ -76,6 +85,15 @@ static void noteDone(NSURLSessionTask *task) {
             [run setString:@""];
         }
     }
+    // The response's own id (a uuid before "spotify:page:...") is what a client sends back to continue a feed.
+    NSData *marker = [@"spotify:page:" dataUsingEncoding:NSUTF8StringEncoding];
+    NSRange page = [body rangeOfData:marker options:NSDataSearchBackwards range:NSMakeRange(0, body.length)];
+    NSString *responseID = @"none";
+    if (page.location != NSNotFound && page.location >= 38) {
+        NSData *uuid = [body subdataWithRange:NSMakeRange(page.location - 38, 36)];
+        responseID = [[NSString alloc] initWithData:uuid encoding:NSASCIIStringEncoding] ?: @"unreadable";
+    }
+    SGLog(@"feed: casita response id %@", responseID);
     SGLog(@"feed: casita body %lu bytes, gzip %@, first bytes %@, strings %@", (unsigned long)body.length,
           body.length > 1 && bytes[0] == 0x1f && bytes[1] == 0x8b ? @"yes" : @"no", hex(body, 96), strings);
     if (sg_saved < kMaxSaved) {
