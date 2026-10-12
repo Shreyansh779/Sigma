@@ -66,6 +66,7 @@ BOOL SGRHomeSectionCollapsed(UIView *cell);
 // Has the page's list measure the section around `view` again, on the next turn of the run loop: for a shelf
 // whose heading came in after the list sized it (HomeSections.x).
 void SGRHomeMeasureAgain(UIView *view);
+BOOL SGRHomeSectionWaiting(UIView *view);   // the section is collapsed until its shelf is read (HomeSections.x)
 
 // Styles a shortcut tile (id=Shortcut.Card.Home) and keeps its picture in step with its cover (HomeTiles.m).
 void SGRHomeStyleTile(UIView *tile);
