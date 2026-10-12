@@ -34,10 +34,9 @@ typedef NS_ENUM(NSInteger, SGRHomeKind) {
     SGRHomeKindPending,   // the section's root is not in the cell yet: left as it is
     SGRHomeKindKeep,
     SGRHomeKindDrop,
-    SGRHomeKindUnidentified,   // a shelf with a heading to wait for, while a shelf is hidden: kept collapsed until it is read
 };
 
-static char kCollapsedKey, kDroppedKey, kTentativeKey, kGaveUpKey;
+static char kCollapsedKey, kDroppedKey;
 
 #pragma mark - the dropped sections' gap
 
@@ -154,13 +153,12 @@ static SGRHomeKind stackKind(UIStackView *stack) {
     return stack.arrangedSubviews.count >= 2 ? SGRHomeKindDrop : SGRHomeKindPending;
 }
 
-// A shelf stays unless its heading names one that is switched off. While one is, a shelf with no heading to read yet
-// is not shown and measured to be hidden a moment later (the flicker, and the cost of sizing it): its cell stays
-// collapsed until HomeHeadings.x asks it to measure again with the heading there, or half a second goes by.
+// A shelf stays unless its heading names one that is switched off; one with no heading to read yet stays, and
+// HomeHeadings.x asks the cell to measure again once there is one.
 static SGRHomeKind shelfKind(UIView *shelf) {
     if (!SGRHomeShelfFilterActive()) return SGRHomeKindKeep;
     NSString *identity = SGRHomeShelfIdentity(shelf);
-    if (!identity) return SGRHomeKindUnidentified;
+    if (!identity) return SGRHomeKindKeep;
     SGRHomeNoteShelf(identity);
     return SGRHomeShelfHidden(identity) ? SGRHomeKindDrop : SGRHomeKindKeep;
 }
@@ -286,31 +284,18 @@ static void logModel(UICollectionViewCell *cell, UIView *content, NSString *kind
     dropDJHeading(content);
     NSString *rootName = nil;
     SGRHomeKind kind = kindOf(content, &rootName);
-    if (kind == SGRHomeKindUnidentified && objc_getAssociatedObject(cell, &kGaveUpKey)) kind = SGRHomeKindKeep;
     // A section to drop is not measured: Spotify builds and sizes a preview or a video in full (its players and covers),
     // which is the cost of scrolling past one, and the size is thrown away. Its cell is 0 tall from the start, so the
     // page does not jump back as the section collapses under the finger either.
-    if (kind == SGRHomeKindDrop || kind == SGRHomeKindUnidentified) {
-        BOOL tentative = kind == SGRHomeKindUnidentified;
-        objc_setAssociatedObject(cell, &kTentativeKey, tentative ? @YES : nil, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-        if (tentative) {
-            __weak UICollectionViewCell *weakCell = cell;
-            dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.5 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
-                UICollectionViewCell *still = weakCell;
-                if (!still || !objc_getAssociatedObject(still, &kTentativeKey)) return;
-                objc_setAssociatedObject(still, &kGaveUpKey, @YES, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-                SGRHomeMeasureAgain(still.contentView);
-            });
-        }
+    if (kind == SGRHomeKindDrop) {
         UICollectionViewLayoutAttributes *dropped = [attributes copy];
         collapse(cell, MAX(1, attributes.size.height));
         dropped.size = CGSizeMake(attributes.size.width, 0);
         markDropped(cell, attributes.indexPath.section, YES);
-        if (!tentative) logOnce([@"dropped a section of " stringByAppendingString:rootName ?: @"no root"]);
+        logOnce([@"dropped a section of " stringByAppendingString:rootName ?: @"no root"]);
         SGRHomeProbeEnd(SGRHomeProbeSections, began);
         return dropped;
     }
-    objc_setAssociatedObject(cell, &kTentativeKey, nil, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
     CFTimeInterval measuring = CACurrentMediaTime();
     UICollectionViewLayoutAttributes *result = %orig;
     measuring = CACurrentMediaTime() - measuring;
@@ -347,18 +332,9 @@ static void logModel(UICollectionViewCell *cell, UIView *content, NSString *kind
 
 - (void)prepareForReuse {
     %orig;
-    objc_setAssociatedObject(self, &kTentativeKey, nil, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-    objc_setAssociatedObject(self, &kGaveUpKey, nil, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
     if (objc_getAssociatedObject(self, &kCollapsedKey)) expand((UICollectionViewCell *)self);
 }
 %end
-
-// Whether the section around `view` is held collapsed until its shelf is read (SGRHomeKindUnidentified).
-BOOL SGRHomeSectionWaiting(UIView *view) {
-    UIView *cell = nil;
-    for (UIView *v = view; v; v = v.superview) if ([v isKindOfClass:UICollectionViewCell.class]) cell = v;
-    return cell && objc_getAssociatedObject(cell, &kTentativeKey) != nil;
-}
 
 BOOL SGRHomeSectionCollapsed(UIView *cell) {
     return objc_getAssociatedObject(cell, &kCollapsedKey) != nil;
