@@ -15,7 +15,7 @@
 #import "Redesigned/Kit/SGRKit.h"
 #import "Home.h"
 
-static const CGFloat kScale = 1.7, kSmallest = 120, kHeading = 40;
+static const CGFloat kScale = 1.7, kSmallest = 120, kLargestCard = 260, kHeading = 40, kShelfSlack = 120;
 static char kLargeKey, kNaturalKey, kWrappedKey, kWidthKey, kAskedKey;
 static _Thread_local BOOL sg_enlarging;
 // The narrowest size kSmallest or more wide the running provider made, at Spotify's width: its cards.
@@ -74,7 +74,9 @@ static CGFloat growth(CGFloat width) {
     if (!width.isAbsolute || width.dimension < kSmallest) return %orig;
     // The cards come first, then the row that holds them all (1634 by 195 on the phone): the row is as many cards
     // wide, so it widens by kScale too, but grows in height only as much as a card does.
-    sg_cardWidth = sg_cardWidth > 0 ? MIN(sg_cardWidth, width.dimension) : width.dimension;
+    // A card is never wider than this: a size wider is the row, and taken for a card it would grow the shelf by
+    // 0.7 of the row's 1600 and more, a blank stretch of Home under the cards.
+    if (width.dimension <= kLargestCard) sg_cardWidth = sg_cardWidth > 0 ? MIN(sg_cardWidth, width.dimension) : width.dimension;
     if (!sg_enlarging || !(height.isAbsolute || height.isEstimated)) return %orig;
     CGFloat grow = growth(sg_cardWidth);
     NSCollectionLayoutDimension *wider = [NSCollectionLayoutDimension absoluteDimension:round(width.dimension * kScale)];
@@ -125,8 +127,17 @@ static CGFloat growth(CGFloat width) {
     // Never shorter than what the shelf lays out: Spotify's height can be taken before its tallest card sized
     // itself (a title on 4 lines), and the shelf then scrolls inside its cell. The shelf's height comes from its
     // cards, not from the cell, so taking it does not feed back.
-    if (natural && large && card) result.size = CGSizeMake(result.size.width, MAX(natural.doubleValue + growth(card.doubleValue),
-                                                                              ceil(layout.collectionViewContentSize.height)));
+    if (natural && large && card) {
+        CGFloat grown = natural.doubleValue + growth(card.doubleValue), content = ceil(layout.collectionViewContentSize.height);
+        // A content height far past the grown shelf is a layout caught mid-change, not cards on 4 lines: it is not
+        // taken, or Home keeps a blank stretch under the shelf (and says so once in the log).
+        if (content > grown + kShelfSlack) {
+            static dispatch_once_t once;
+            dispatch_once(&once, ^{ SGLog(@"redesign home: top picks content %.0f against %.0f grown, kept at the grown height", content, grown); });
+            content = grown;
+        }
+        result.size = CGSizeMake(result.size.width, MAX(grown, content));
+    }
     else if (natural && was) result.size = CGSizeMake(result.size.width, natural.doubleValue);
     return result;
 }

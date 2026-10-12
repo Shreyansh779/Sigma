@@ -668,6 +668,7 @@ void SGRPlayerToggleLyrics(void) {
 // A layout pass, a new track or a turn of the phone: the state is put back where it belongs without
 // animating, since the frames it is measured from have just changed.
 static void replace(void) {
+    SGRPlayerPlaceVolumeAgain();
     UIView *host = sg_host;
     if (!host || sg_moving) return;   // a pass in the middle of the transition would cut it short
     SGRLyricsLayout l = layoutIn(host);
@@ -783,7 +784,8 @@ static void replace(void) {
 // Lines kept for the track playing, or the look for them over with none. The glyph is told only when they
 // are here, since SGRPlayerLyricsChanged sets the animated artwork's blur each time.
 - (void)linesKept:(NSNotification *)note {
-    if (![note.object isEqual:SGKaraokePlayingTrack()]) return;
+    // The track this watcher saw come on counts too: the lines can land before the player's own state names it.
+    if (![note.object isEqual:SGKaraokePlayingTrack()] && ![note.object isEqual:_track]) return;
     if (SGRPlayerLyricsAvailable()) SGRPlayerLyricsChanged();
     else [self closeIfNone];
 }
@@ -809,6 +811,16 @@ static void replace(void) {
     _track = track;
     _graceOver = NO;
     SGRPlayerLyricsChanged();
+    // The lyrics button, and the volume row, asked again as the new track settles: lines kept before the player's
+    // state named it, or a layout that moved the controls, leave nothing else to ask them, and the button stayed dimmed
+    // (and the row where the last song had it) until the player was closed and opened again.
+    for (NSNumber *wait in @[@0.3, @1, @3]) {
+        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(wait.doubleValue * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+            if (![self->_track isEqualToString:track]) return;
+            SGRPlayerLyricsChanged();
+            SGRPlayerPlaceVolumeAgain();
+        });
+    }
     // The lines already up wait out a grace for the new track's before they go, a track after it its own.
     dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(kLyricsGrace * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
         if (![self->_track isEqualToString:track]) return;
