@@ -26,8 +26,6 @@
 // without that inset, so the list closes up around it with one 24pt gap, not two.
 #import <objc/runtime.h>
 #import <QuartzCore/QuartzCore.h>
-#import <malloc/malloc.h>
-#import <mach/mach.h>
 #import "Core/SGCore.h"
 #import "Redesigned/Kit/SGRKit.h"
 #import "Home.h"
@@ -155,14 +153,10 @@ static SGRHomeKind stackKind(UIStackView *stack) {
     return stack.arrangedSubviews.count >= 2 ? SGRHomeKindDrop : SGRHomeKindPending;
 }
 
-// A shelf stays unless its heading names one that is switched off; one with no heading to read yet stays, and
-// HomeHeadings.x asks the cell to measure again once there is one.
+// A shelf always stays here: one switched off is cut out of the feed before Home sees it (HomeFeed.x), and one that was
+// not cut (a title the feed words differently) stays as Spotify shows it rather than be sized and then collapsed.
 static SGRHomeKind shelfKind(UIView *shelf) {
-    if (!SGRHomeShelfFilterActive()) return SGRHomeKindKeep;
-    NSString *identity = SGRHomeShelfIdentity(shelf);
-    if (!identity) return SGRHomeKindKeep;
-    SGRHomeNoteShelf(identity);
-    return SGRHomeShelfHidden(identity) ? SGRHomeKindDrop : SGRHomeKindKeep;
+    return SGRHomeKindKeep;
 }
 
 // Before the cell is measured, so the height it reports is without the heading.
@@ -176,126 +170,13 @@ static void dropDJHeading(UIView *content) {
     }
 }
 
-// A section knows its shelf before the shelf is measured: the cell's content holds the shelf's data (an object of
-// Home_EvoPageImpl.HomeStructure, ShelfData and its kin, from Spotify's feed), which carries the section's id. The id
-// is a Swift String, read here byte by byte; the identity a shelf's heading gave once is kept under it (here and in
-// the preferences), and the next time the section is sized Home knows at once whether to drop it, without sizing it
-// first or reading its heading. Anything that does not look as expected gives nil and the old way.
-static NSString *const kShelfIdsKey = @"spotifyglass.redesign.home.shelfIds";
-static const NSUInteger kShelfIdsMax = 400;
-
-// The text of the Swift String at `at`: inline when it is short, else in the object the string points to.
-static NSString *swiftString(const unsigned char *at) {
-    uint64_t count = 0, object = 0;
-    memcpy(&count, at, 8);
-    memcpy(&object, at + 8, 8);
-    unsigned char tag = (unsigned char)(object >> 56);
-    const unsigned char *bytes = NULL;
-    unsigned char buffer[160];
-    if ((tag & 0xF0) == 0xE0) {
-        count = tag & 0x0F;
-        bytes = at;
-    } else {
-        count &= 0x0000FFFFFFFFFFFFULL;
-        uint64_t address = object & 0x0FFFFFFFFFFFFFFFULL;
-        unsigned char kind = tag >> 4;
-        if (count == 0 || count >= sizeof buffer || address < 0x100000000ULL) return nil;
-        if (kind == 0x0) address += 32;       // native: the characters follow the object's header
-        else if (kind != 0x8) return nil;     // immortal (a literal) points at them
-        vm_size_t read = 0;
-        if (vm_read_overwrite(mach_task_self(), (vm_address_t)address, (vm_size_t)count, (vm_address_t)buffer, &read) != KERN_SUCCESS || read != count) return nil;
-        bytes = buffer;
-    }
-    if (count == 0 || count >= sizeof buffer) return nil;
-    for (uint64_t i = 0; i < count; i++) if (bytes[i] < 0x20 || bytes[i] > 0x7E) return nil;
-    return [[NSString alloc] initWithBytes:bytes length:(NSUInteger)count encoding:NSASCIIStringEncoding];
-}
-
-// The shelf's data in the cell's content (a HomeStructure object: ShelfData, RecentsData...), nil when it is not found.
-static const unsigned char *shelfData(UIView *content, Class *dataClass) {
-    static Ivar configuration, after;
-    static BOOL looked;
-    if (!looked) {
-        looked = YES;
-        for (Class c = object_getClass(content); c && !configuration; c = class_getSuperclass(c)) {
-            configuration = class_getInstanceVariable(c, "elementConfiguration");
-            after = class_getInstanceVariable(c, "elementView");
-        }
-    }
-    if (!configuration || !after) return NULL;
-    ptrdiff_t from = ivar_getOffset(configuration), to = ivar_getOffset(after);
-    if (to <= from || to - from > 512) return NULL;
-    const unsigned char *base = (const unsigned char *)(__bridge void *)content;
-    for (ptrdiff_t at = from; at + 8 <= to; at += 8) {
-        uint64_t word = 0;
-        memcpy(&word, base + at, 8);
-        uint64_t address = word & 0x00007FFFFFFFFFF8ULL;
-        if (address < 0x100000000ULL || malloc_size((const void *)address) == 0) continue;
-        Class cls = object_getClass((__bridge id)(const void *)address);
-        const char *name = cls ? class_getName(cls) : NULL;
-        if (!name || strncmp(name, "_TtCO16Home_EvoPageImpl13HomeStructure", 38) != 0) continue;
-        if (dataClass) *dataClass = cls;
-        return (const unsigned char *)address;
-    }
-    return NULL;
-}
-
-static NSString *sectionKey(UIView *content) {
-    Class cls = Nil;
-    const unsigned char *data = shelfData(content, &cls);
-    if (!data) return nil;
-    Ivar sectionID = class_getInstanceVariable(cls, "sectionID") ?: class_getInstanceVariable(cls, "sectionId");
-    return sectionID ? swiftString(data + ivar_getOffset(sectionID)) : nil;
-}
-
-// The shelf's title as its data has it, before any view: the heading's first field is a String. What a heading's title
-// is in the data is the heading's text in the view, for a plain one ("Recents", "Popular artists"); a shelf with a small
-// line over its title is known by the identity the view gives it (SGRHomeShelfIdentity), learned under its section id.
-static NSString *dataTitle(UIView *content) {
-    Class cls = Nil;
-    const unsigned char *data = shelfData(content, &cls);
-    Ivar heading = data ? class_getInstanceVariable(cls, "heading") : NULL;
-    if (!heading || (size_t)ivar_getOffset(heading) + 16 > malloc_size(data)) return nil;
-    return swiftString(data + ivar_getOffset(heading));
-}
-
-static NSMutableDictionary<NSString *, NSString *> *shelfIds(void) {
-    static NSMutableDictionary *ids;
-    if (!ids) {
-        NSDictionary *stored = [NSUserDefaults.standardUserDefaults dictionaryForKey:kShelfIdsKey];
-        ids = [NSMutableDictionary dictionary];
-        for (NSString *key in stored) if ([key isKindOfClass:NSString.class] && [stored[key] isKindOfClass:NSString.class]) ids[key] = stored[key];
-    }
-    return ids;
-}
-
-static void learnShelf(NSString *key, NSString *identity) {
-    NSMutableDictionary<NSString *, NSString *> *ids = shelfIds();
-    if ([ids[key] isEqualToString:identity]) return;
-    if (!ids[key] && ids.count >= kShelfIdsMax) [ids removeAllObjects];
-    ids[key] = identity;
-    [NSUserDefaults.standardUserDefaults setObject:ids forKey:kShelfIdsKey];
-}
-
 static SGRHomeKind kindOf(UIView *content, NSString **rootName) {
     UIView *root = content.subviews.firstObject.subviews.firstObject;
     if (!root) return SGRHomeKindPending;
     *rootName = NSStringFromClass(root.class);
     static Class shelf;
     if (!shelf) shelf = NSClassFromString(@"_TtC16Home_CarouselKit29TouchCancellingCollectionView");
-    if (shelf && [root isKindOfClass:shelf]) {
-        if (!SGRHomeShelfFilterActive()) return SGRHomeKindKeep;
-        NSString *key = sectionKey(content), *known = key ? shelfIds()[key] : nil;
-        if (known) return SGRHomeShelfHidden(known) ? SGRHomeKindDrop : SGRHomeKindKeep;
-        // A hidden shelf is dropped in the pass that sizes it, never shown first and hidden after: that shrinks the page
-        // under the finger, and at its foot pushes the reader back up.
-        NSString *title = dataTitle(content);
-        if (title && SGRHomeShelfHidden(title)) return SGRHomeKindDrop;
-        SGRHomeKind kind = shelfKind(root);
-        NSString *identity = key ? SGRHomeShelfIdentity(root) : nil;
-        if (identity) learnShelf(key, identity);
-        return kind;
-    }
+    if (shelf && [root isKindOfClass:shelf]) return shelfKind(root);
     if ([root isKindOfClass:UICollectionView.class]) return gridKind((UICollectionView *)root);
     if ([root isKindOfClass:UIStackView.class]) return stackKind((UIStackView *)root);
     return optionalKind(*rootName);
@@ -402,13 +283,7 @@ static void logModel(UICollectionViewCell *cell, UIView *content, NSString *kind
     // A section to drop is not measured: Spotify builds and sizes a preview or a video in full (its players and covers),
     // which is the cost of scrolling past one, and the size is thrown away. Its cell is 0 tall from the start, so the
     // page does not jump back as the section collapses under the finger either.
-    // A shelf is sized once by Spotify before it is left unsized: skipping its first sizing raised an exception in
-    // Spotify's own code (crash reports, 2026-10-12), which a preview or a video never did.
-    static NSMutableSet<NSString *> *sized;
-    if (!sized) sized = [NSMutableSet set];
-    NSString *shelfKey = [rootName containsString:@"TouchCancellingCollectionView"] ? sectionKey(content) : nil;
-    BOOL shelf = [rootName containsString:@"TouchCancellingCollectionView"];
-    if (kind == SGRHomeKindDrop && (!shelf || (shelfKey && [sized containsObject:shelfKey]))) {
+    if (kind == SGRHomeKindDrop) {
         UICollectionViewLayoutAttributes *dropped = [attributes copy];
         collapse(cell, MAX(1, attributes.size.height));
         dropped.size = CGSizeMake(attributes.size.width, 0);
@@ -420,7 +295,6 @@ static void logModel(UICollectionViewCell *cell, UIView *content, NSString *kind
     CFTimeInterval measuring = CACurrentMediaTime();
     UICollectionViewLayoutAttributes *result = %orig;
     measuring = CACurrentMediaTime() - measuring;
-    if (shelfKey) [sized addObject:shelfKey];
     // Its root may only have come in while it was sized.
     if (kind == SGRHomeKindPending) kind = kindOf(content, &rootName);
     BOOL collapsed = objc_getAssociatedObject(cell, &kCollapsedKey) != nil;
@@ -457,19 +331,6 @@ static void logModel(UICollectionViewCell *cell, UIView *content, NSString *kind
     if (objc_getAssociatedObject(self, &kCollapsedKey)) expand((UICollectionViewCell *)self);
 }
 %end
-
-// The heading of a shelf read: the identity kept under its section's id is brought into line with it, and the section
-// measured again when that changes whether it is dropped.
-void SGRHomeShelfRead(UIView *heading, NSString *identity) {
-    if (!identity.length || !SGRHomeShelfFilterActive()) return;
-    UIView *cell = nil;
-    for (UIView *v = heading; v; v = v.superview) if ([v isKindOfClass:UICollectionViewCell.class]) cell = v;
-    NSString *key = cell ? sectionKey(((UICollectionViewCell *)cell).contentView) : nil;
-    NSString *known = key ? shelfIds()[key] : nil;
-    if (!key || [known isEqualToString:identity]) return;
-    learnShelf(key, identity);
-    if (known && SGRHomeShelfHidden(known) != SGRHomeShelfHidden(identity)) SGRHomeMeasureAgain(heading);
-}
 
 BOOL SGRHomeSectionCollapsed(UIView *cell) {
     return objc_getAssociatedObject(cell, &kCollapsedKey) != nil;
