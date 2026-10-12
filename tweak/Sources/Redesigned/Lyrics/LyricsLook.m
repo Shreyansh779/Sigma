@@ -1,4 +1,5 @@
 // The lyrics' look as stored, its presets and the preview's lines. The page is LyricsLookSettings.m.
+#import "Core/SGCore.h"
 #import "LyricsLook.h"
 
 NSNotificationName const SGRLyricsLookDidChangeNotification = @"spotifyglass.redesign.lyricsLookDidChange";
@@ -51,6 +52,8 @@ void SGRSetLyricsLook(SGRLyricsLook look, id changer) {
         @"glow": @(held(look.glow, kLeast.glow, kMost.glow)),
         @"wave": @(held(look.wave, kLeast.wave, kMost.wave)),
     } forKey:SGRKeyLyricsLook];
+    SGLog(@"lyrics look: set to %.0f pt, %.0f apart, blur %.1f, glow %.1f, wave %.1f; read back %@", look.size, look.spacing, look.blur, look.glow, look.wave,
+          [NSUserDefaults.standardUserDefaults dictionaryForKey:SGRKeyLyricsLook]);
     [NSNotificationCenter.defaultCenter postNotificationName:SGRLyricsLookDidChangeNotification object:changer];
 }
 
