@@ -65,12 +65,19 @@ void SGMotionClipFor(NSString *uri, NSURL *canvas, NSString *artist, NSString *a
 @interface SGMotionFollower : NSObject
 - (instancetype)initWithBegin:(BOOL (^)(NSString *uri, SPTPlayerState *state))begin
                         found:(void (^)(NSString *uri, NSURL *file))found;
+// Looks a track's clip up in place of SGMotionClipFor, for a user with a way of its own; the next track's clip is
+// then not fetched ahead. `done` runs on the main queue, and not at all for a walk a newer one overtook.
+@property (nonatomic, copy) void (^clipFor)(NSString *uri, NSURL *canvas, NSString *artist, NSString *album,
+                                            void (^done)(NSURL *file, NSString *source));
 // The track is walked again from the player's last state: a setting it depends on changed.
 - (void)restart;
 @end
 // The row that opens the ordered list, for the Player page and the lock screen's.
 @class SGModRow;
 SGModRow *SGMotionSourcesRow(void);
+
+// The Canvas Spotify's Canvas service has for the track `uri`, as the address of its video, or nil. Main queue.
+void SGMotionCanvasFromService(NSString *uri, void (^done)(NSURL *canvas));
 
 // Any remote video (a Canvas) as a local file, or nil. Main queue.
 void SGMotionFile(NSURL *remote, void (^done)(NSURL *file));

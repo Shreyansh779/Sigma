@@ -68,7 +68,7 @@ NSURL *SGMotionCanvasIn(NSDictionary *metadata) {
 static NSMutableDictionary<NSString *, id> *sg_answers;
 static NSMutableDictionary<NSString *, NSMutableArray *> *sg_asking;
 
-static void canvasFromService(NSString *uri, void (^done)(NSURL *canvas)) {
+void SGMotionCanvasFromService(NSString *uri, void (^done)(NSURL *canvas)) {
     // Songs only: a local file, an episode or an ad has no Canvas to ask for.
     id answer = [uri hasPrefix:@"spotify:track:"] ? sg_answers[uri] : NSNull.null;
     if (answer) {
@@ -137,7 +137,7 @@ void SGMotionClipFor(NSString *uri, NSURL *canvas, NSString *artist, NSString *a
         };
         if ([source isEqualToString:kCanvas]) {
             if (canvas) SGMotionFile(canvas, next);
-            else canvasFromService(uri, ^(NSURL *found) {
+            else SGMotionCanvasFromService(uri, ^(NSURL *found) {
                 if (found) SGMotionFile(found, next);
                 else next(nil);
             });
