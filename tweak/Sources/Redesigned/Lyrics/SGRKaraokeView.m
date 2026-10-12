@@ -1521,6 +1521,16 @@ typedef struct {
 // While the user browses, placement stands still and every line is sharp.
 - (void)scrollViewWillBeginDragging:(UIScrollView *)scrollView {
     [NSObject cancelPreviousPerformRequestsWithTarget:self selector:@selector(followSong) object:nil];
+    // The glide home is a view animation of the offset, which UIScrollView does not know to stop at a touch: left
+    // to run it kept drawing the offset it was headed for over the finger's until it ended.
+    CALayer *shown = (CALayer *)_scroll.layer.presentationLayer;
+    BOOL gliding = NO;
+    for (NSString *key in _scroll.layer.animationKeys) {
+        if (![key hasPrefix:@"bounds"]) continue;
+        [_scroll.layer removeAnimationForKey:key];
+        gliding = YES;
+    }
+    if (gliding && shown) _scroll.contentOffset = shown.bounds.origin;
     if (!_browsing) {
         _browseAnchor = self.bounds.size.height * kAnchor;
         _browseBreak = _openBreak;
@@ -1653,7 +1663,6 @@ typedef struct {
         _extrasBox.frame = CGRectMake(_margin, self.bounds.size.height - kExtrasSide - kExtrasBottom, kExtrasSide, kExtrasSide);
         SGRShowGlass(SGRGlassInside(_extrasBox, &kExtrasGlassKey, kExtrasSide), !_extrasHidden);
     }
-    [self clearBottomRow];
     if (_lines && self.bounds.size.width != _builtWidth) {
         [self rebuild];
     } else if (_tops && self.bounds.size.height != _placedHeight) {
@@ -1664,24 +1673,6 @@ typedef struct {
         [self placeLinesAnimated:NO];
     }
     _placedHeight = self.bounds.size.height;
-}
-
-// The lines fade out above the bottom row (the mic and the extras button) and stay clear under
-// it, so none is read through the credit; with nothing there they fade out at the bottom edge.
-- (void)clearBottomRow {
-    CGFloat height = self.bounds.size.height;
-    if (height <= 0) return;
-    CGFloat floor = height;
-    for (UIView *view in @[_sing ?: NSNull.null, _extrasBox ?: NSNull.null]) {
-        if ([view isKindOfClass:UIView.class] && !view.hidden && view.superview) floor = MIN(floor, CGRectGetMinY(view.frame) - 8);
-    }
-    CGFloat clear = MAX(0, MIN(1, (height - floor) / height));
-    NSArray *locations = @[@0, @(kEdgeFade), @(MAX(kEdgeFade, 1 - clear - kEdgeFade)), @(1 - clear), @1];
-    if ([_fade.locations isEqualToArray:locations]) return;
-    [CATransaction begin];
-    [CATransaction setDisableActions:YES];
-    _fade.locations = locations;
-    [CATransaction commit];
 }
 
 - (void)dropLineViews {
