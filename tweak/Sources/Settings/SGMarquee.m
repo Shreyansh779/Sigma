@@ -95,8 +95,9 @@ static NSString *const kScroll = @"sg.marquee";
     ];
     scroll.duration = total;
     scroll.repeatCount = HUGE_VALF;
-    // A text's glide needs no more than the display's base rate.
-    if (@available(iOS 15.0, *)) scroll.preferredFrameRateRange = CAFrameRateRangeMake(30, 60, 60);
+    // No frame rate asked for. It used to ask for at most 60 Hz, and this animation runs for as long as a long title
+    // is on screen (the mini player's, always), which may have held the display down while Home was scrolled; the
+    // FLEX build's scroll profiler asks for 120 Hz there, and Home did not lag in it. Untested on a normal build.
     [_label.layer addAnimation:scroll forKey:kScroll];
 }
 
