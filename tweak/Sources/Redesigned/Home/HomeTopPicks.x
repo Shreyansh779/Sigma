@@ -151,10 +151,10 @@ static BOOL blocks(UICollectionViewLayout *layout, CGRect *grid, CGRect *shelf, 
     NSInteger shelfSection = sg_topIndex == NSIntegerMax ? NSNotFound : sg_topIndex / 10000, shelfItem = sg_topIndex % 10000;
     sg_blocksGridSection = sg_gridSection;
     sg_blocksShelfSection = shelfSection;
-    if (sg_gridSection == NSNotFound || shelfSection == NSNotFound || sg_gridSection >= shelfSection) return NO;
+    if (shelfSection == NSNotFound || (sg_gridSection != NSNotFound && sg_gridSection >= shelfSection)) return NO;
     UICollectionView *list = layout.collectionView;
     NSInteger sections = list.numberOfSections;
-    if (sg_gridSection >= sections || [list numberOfItemsInSection:sg_gridSection] < 1) {
+    if (sg_gridSection != NSNotFound && (sg_gridSection >= sections || [list numberOfItemsInSection:sg_gridSection] < 1)) {
         sg_gridSection = NSNotFound;
         return NO;
     }
@@ -164,13 +164,19 @@ static BOOL blocks(UICollectionViewLayout *layout, CGRect *grid, CGRect *shelf, 
         return NO;
     }
     sg_unmoved = YES;
-    UICollectionViewLayoutAttributes *a = [layout layoutAttributesForItemAtIndexPath:[NSIndexPath indexPathForItem:0 inSection:sg_gridSection]];
+    NSInteger anchor = sg_gridSection;
+    // With no shortcuts grid (switched off, so 0 tall) the shelf takes the place of the first section above it that has height.
+    for (NSInteger s = 0; anchor == NSNotFound && s < shelfSection; s++) {
+        if ([list numberOfItemsInSection:s] > 0 && [layout layoutAttributesForItemAtIndexPath:[NSIndexPath indexPathForItem:0 inSection:s]].frame.size.height > 0) anchor = s;
+    }
+    sg_blocksGridSection = anchor;
+    UICollectionViewLayoutAttributes *a = anchor == NSNotFound ? nil : [layout layoutAttributesForItemAtIndexPath:[NSIndexPath indexPathForItem:0 inSection:anchor]];
     UICollectionViewLayoutAttributes *b = [layout layoutAttributesForItemAtIndexPath:[NSIndexPath indexPathForItem:shelfItem inSection:shelfSection]];
     CGFloat last = CGRectGetMaxY(a.frame);
     if (a && b) {
         for (UICollectionViewLayoutAttributes *between in [layout layoutAttributesForElementsInRect:CGRectUnion(a.frame, b.frame)]) {
             NSInteger section = between.indexPath.section;
-            if (section >= sg_gridSection && section < shelfSection) last = MAX(last, CGRectGetMaxY(between.frame));
+            if (section >= anchor && section < shelfSection) last = MAX(last, CGRectGetMaxY(between.frame));
         }
     }
     sg_unmoved = NO;
