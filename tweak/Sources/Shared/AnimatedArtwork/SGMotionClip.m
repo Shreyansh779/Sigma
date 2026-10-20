@@ -1,5 +1,6 @@
 // SGMotionClip.h says what these are. The cut is the encoder's: the writer is given the cut's size and told
-// to fill it keeping the picture's shape, so it drops what overhangs either side and scales nothing.
+// to fill it keeping the picture's shape, so it drops what overhangs either side. A cut smaller than
+// SGMotionClipOutput's size is written at that size, the writer scaling the picture up to it.
 #import <AVFoundation/AVFoundation.h>
 #import "Shared/AdBlock/Protobuf.h"
 #import "SGMotionClip.h"
@@ -12,6 +13,12 @@ CGSize SGMotionClipCut(CGSize shown, CGFloat ratio) {
                                                     : CGSizeMake(shown.width, shown.width / ratio);
     // H.264 takes even sides; rounded down, so the cut stays inside the picture.
     return CGSizeMake(floor(cut.width / 2) * 2, floor(cut.height / 2) * 2);
+}
+
+CGSize SGMotionClipOutput(CGSize cut) {
+    // Scaled up until 1440 tall (1080 x 1440 for 3:4, 1440 square for 1:1), never down.
+    CGFloat scale = MAX(1, 1440 / cut.height);
+    return CGSizeMake(round(cut.width * scale / 2) * 2, round(cut.height * scale / 2) * 2);
 }
 
 BOOL SGMotionClipShape(NSURL *file, CGFloat ratio, NSURL *out) {
@@ -31,6 +38,7 @@ BOOL SGMotionClipShape(NSURL *file, CGFloat ratio, NSURL *out) {
     CGSize stored = track.naturalSize, shown = sideways ? CGSizeMake(stored.height, stored.width) : stored;
     CGSize cut = SGMotionClipCut(shown, ratio);
     if (cut.width < 2 || cut.height < 2) return NO;
+    cut = SGMotionClipOutput(cut);
     if (sideways) cut = CGSizeMake(cut.height, cut.width);
 
     AVAssetReader *reader = [AVAssetReader assetReaderWithAsset:asset error:nil];

@@ -6,8 +6,10 @@
 
 // The largest size of `ratio` (width over height) inside `shown`, about its middle, in even pixels.
 CGSize SGMotionClipCut(CGSize shown, CGFloat ratio);
-// Writes `file` cut about its middle to `ratio` to `out` (H.264, the clip's own frame times), replacing it,
-// and returns once it is written; NO if it was not. Blocks, so never on the main queue.
+// The size a cut is written at: scaled up to 1440 tall if smaller, never down.
+CGSize SGMotionClipOutput(CGSize cut);
+// Writes `file` cut about its middle to `ratio` at SGMotionClipOutput's size to `out` (H.264, the clip's own
+// frame times), replacing it, and returns once it is written; NO if it was not. Blocks, so never on the main queue.
 BOOL SGMotionClipShape(NSURL *file, CGFloat ratio, NSURL *out);
 
 // The body that asks Spotify's Canvas service (canvaz-cache) for a track's Canvas: field 1, an entity
