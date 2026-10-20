@@ -24,7 +24,7 @@ static const NSUInteger kLongFramesDescribed = 5;
 
 // Section sizing includes Spotify's own measuring of the cell, which the hook calls through.
 static const char *const kProbeNames[SGRHomeProbeCount] = {"section sizing", "header", "headings", "cards", "tiles",
-    "labels", "labels matched", "indicator shown", "list attrs", "shelf layout", "large card", "tint asks"};
+    "labels", "labels matched", "indicator shown", "list attrs", "shelf layout", "large card", "tint asks", "feed model"};
 static NSUInteger sg_calls[SGRHomeProbeCount];
 static CFTimeInterval sg_time[SGRHomeProbeCount];
 static __weak UIScrollView *sg_list;
