@@ -6,7 +6,7 @@
 // the artwork is.
 #import <MediaPlayer/MediaPlayer.h>
 #import "Core/SGCore.h"
-#import "AnimatedArtwork.h"
+#import "Shared/AnimatedArtwork/AnimatedArtwork.h"
 #import "Shared/Player/PlayerState.h"
 
 static NSString *const kLikeDislikeFlag = @"ios-feature-lockscreen.like_dislike_enabled";
