@@ -36,7 +36,7 @@ static const CGFloat kBandAbove = -2;
 // The footer's text, in from the card's edges (the reference's first glyph sits 13.7pt in; a glyph's side bearing
 // is about 1.5).
 static const CGFloat kFooterInset = 12;
-static char kLargeKey, kNaturalKey, kWrappedKey, kGrowKey, kAskedKey, kListKey, kOffsetKey, kHeldKey, kShowAllKey, kHeadingKey;
+static char kLargeKey, kNaturalKey, kWrappedKey, kGrowKey, kAskedKey, kListKey, kOffsetKey, kHeldKey, kShowAllKey, kHeadingKey, kServedKey;
 static __weak UICollectionView *sg_largeShelf;
 static _Thread_local BOOL sg_enlarging;
 // The list section the shortcuts grid is in, from its measuring; NSNotFound until one is.
@@ -215,8 +215,11 @@ static void move(UICollectionViewLayoutAttributes *attributes, CGRect grid, CGRe
     CGRect grid, shelf;
     CGFloat before;
     BOOL swap = blocks((UICollectionViewLayout *)self, &grid, &shelf, &before);
-    // Everything between the two blocks moves within their band, so the band is asked for whole.
-    CGRect band = swap ? CGRectUnion(grid, shelf) : CGRectZero;
+    // Everything between the two blocks moves within their band, so the band is asked for whole. The moved blocks reach
+    // kBandAbove past the layout's own: a rect that touches only that strip (the prefetch rect above the feed's top,
+    // as Home is pulled to refresh) gets the shelf too, or the list takes its cell for gone and keeps it hidden.
+    CGRect own = CGRectUnion(grid, shelf);
+    CGRect band = swap ? CGRectUnion(own, CGRectOffset(own, 0, kBandAbove)) : CGRectZero;
     if (!swap || !CGRectIntersectsRect(rect, band)) {
         SGRHomeProbeEnd(SGRHomeProbeListAttrs, began);
         return %orig;
@@ -282,16 +285,44 @@ static void topLost(UICollectionView *list) {
     }
 }
 
+// A shelf stops being large: its mark goes, and what read the mark as "the top" (the Show all control, the page's
+// color) with it. Its cells are made again from Spotify's layout: a cell the new layout puts off screen kept its old
+// frame on screen.
+static void dropLarge(UICollectionView *shelf) {
+    objc_setAssociatedObject(shelf.collectionViewLayout, &kLargeKey, nil, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    if (sg_largeShelf == shelf) sg_largeShelf = nil;
+    SGRHomeSetPageTint(nil);
+    [shelf.collectionViewLayout invalidateLayout];
+    __weak UICollectionView *weakShelf = shelf;
+    dispatch_async(dispatch_get_main_queue(), ^{ [weakShelf reloadData]; });
+}
+
 %hook _TtC12Element_List18CollectionViewCell
 - (UICollectionViewLayoutAttributes *)preferredLayoutAttributesFittingAttributes:(UICollectionViewLayoutAttributes *)attributes {
-    UICollectionViewLayoutAttributes *result = %orig;
     static Class shelf;
     if (!shelf) shelf = NSClassFromString(@"_TtC16Home_CarouselKit29TouchCancellingCollectionView");
     UIView *content = ((UICollectionViewCell *)self).contentView.subviews.firstObject;
     // Home's sections only, as HomeSections.x tells them: a shelf on another page is not Home's top.
-    if (![NSStringFromClass(object_getClass(content)) containsString:@"Home_EvoPageImpl13HomeStructure"]) return result;
+    if (![NSStringFromClass(object_getClass(content)) containsString:@"Home_EvoPageImpl13HomeStructure"]) return %orig;
     UIView *root = content.subviews.firstObject;
     NSInteger index = attributes.indexPath.section * 10000 + attributes.indexPath.item;
+    // Spotify reuses a shelf's view for another section as the feed scrolls (and for another shelf at the same index
+    // when the feed comes again), and its layout, which carries the mark and the sizes read from it, comes along. A
+    // view serving a new shelf drops both before Spotify lays it out for this measuring: the other shelf's cards are
+    // never drawn large for a pass, and a view back on the top is measured at Spotify's size first, then made large.
+    if (shelf && [root isKindOfClass:shelf]) {
+        UICollectionViewLayout *layout = ((UICollectionView *)root).collectionViewLayout;
+        BOOL marked = objc_getAssociatedObject(layout, &kLargeKey) != nil;
+        if (marked && index != sg_topIndex) dropLarge((UICollectionView *)root);
+        NSString *served = SGRHomeShelfIdentity(root) ?: [@(index) stringValue];
+        if (![served isEqualToString:objc_getAssociatedObject(layout, &kServedKey)]) {
+            objc_setAssociatedObject(layout, &kServedKey, served, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+            char *keys[] = {&kNaturalKey, &kGrowKey, &kOffsetKey, &kAskedKey};
+            for (size_t i = 0; i < sizeof(keys) / sizeof(keys[0]); i++) objc_setAssociatedObject(layout, keys[i], nil, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+            if (objc_getAssociatedObject(layout, &kLargeKey)) dropLarge((UICollectionView *)root);
+        }
+    }
+    UICollectionViewLayoutAttributes *result = %orig;
     UIView *list = ((UIView *)self).superview;
     while (list && ![list isKindOfClass:UICollectionView.class]) list = list.superview;
     if (list) objc_setAssociatedObject(((UICollectionView *)list).collectionViewLayout, &kListKey, @YES, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
@@ -317,15 +348,13 @@ static void topLost(UICollectionView *list) {
     if (large) sg_largeShelf = (UICollectionView *)root;
     // The shelf's height as Spotify sizes it, from a measuring before it was large.
     if (!was) objc_setAssociatedObject(layout, &kNaturalKey, @(result.size.height), OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-    if (large != was) {
-        objc_setAssociatedObject(layout, &kLargeKey, large ? @YES : nil, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-        if (!large) SGRHomeSetPageTint(nil);
+    if (was && !large) dropLarge((UICollectionView *)root);
+    if (large && !was) {
+        objc_setAssociatedObject(layout, &kLargeKey, @YES, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
         [layout invalidateLayout];
-        // The shelf laid its cells out at Spotify's sizes before the mark changed (reading its heading lays it out), and
-        // a cell the new layout puts off screen kept its old frame on screen: the cells are made again from the new
-        // layout, the heading with them.
-        __weak UICollectionView *weakShelf = (UICollectionView *)root;
-        dispatch_async(dispatch_get_main_queue(), ^{ [weakShelf reloadData]; });
+        // Laid out large now, so the band its heading took (kOffsetKey) and the cards' height are known to the size
+        // below on this pass, not on a later one, which would set the cell to a wrong height in between.
+        [root layoutIfNeeded];
         static dispatch_once_t once;
         dispatch_once(&once, ^{
             SGLog(@"redesign home: top picks at %ld, its layout %@ (%@)", (long)index, NSStringFromClass(layout.class),
