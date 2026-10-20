@@ -221,7 +221,6 @@ static void showCover(NSString *picture) {
             });
         }
         videoAssetFileURLRequestHandler:^(CGSize wanted, void (^completion)(NSURL *)) {
-                SGLog(@"lock motion: %@ video asked at %.0fx%.0f", shaped.lastPathComponent, wanted.width, wanted.height);
             withCover(title, ^(CGImageRef cover) {
                 CFAbsoluteTime start = CFAbsoluteTimeGetCurrent();
                 BOOL ok = [NSFileManager.defaultManager fileExistsAtPath:file.path] || SGFluidClipWrite(file, cover, size);
