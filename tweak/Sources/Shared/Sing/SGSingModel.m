@@ -19,6 +19,7 @@
 #import <CommonCrypto/CommonDigest.h>
 #import "Core/SGCore.h"
 #import "Sing.h"
+#import "SGSingLoader.h"
 
 static NSString *const kRepo = @"https://huggingface.co/My-Name-Is-Jeff/vitrine-sing/resolve/main/";
 static const int kRetries = 3;
@@ -610,6 +611,11 @@ long long SGSingOtherModelBytes(void) {
 
 // No download of it runs: choosing the other model stopped it.
 void SGSingDeleteOtherModel(void) {
+    // A Core ML load of that model still runs for a while after it is abandoned, and can crash on its files going.
+    if (SGSingLoaderOutstanding() > 0) {
+        SGLog(@"sing: the other model is kept while a load of it is outstanding");
+        return;
+    }
     removeModel(unchosen());
 }
 

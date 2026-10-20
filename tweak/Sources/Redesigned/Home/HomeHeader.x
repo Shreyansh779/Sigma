@@ -369,9 +369,19 @@ static void followScroll(UIScrollView *scroll) {
 // The feed: the page's outermost scroll view taller than the pills, found once. Not the tallest: a shelf can grow taller
 // than the page, and a shelf's offset never moves the title. Followed by an observer that lives as long as it does.
 static char kFollowerKey;
-static __weak UIScrollView *sg_feed;
+// The feed is held here, not weakly, so it cannot be freed while its observer is on it: a replaced feed has its observer
+// taken off before it goes.
+static UIScrollView *sg_feed;
 static __weak UIView *sg_pageView;
 static void followFeed(UIScrollView *feed) {
+    UIScrollView *replaced = sg_feed;
+    if (replaced && replaced != feed) {
+        SGRHomeTitleFollower *old = objc_getAssociatedObject(replaced, &kFollowerKey);
+        if (old) {
+            [replaced removeObserver:old forKeyPath:@"contentOffset"];
+            objc_setAssociatedObject(replaced, &kFollowerKey, nil, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+        }
+    }
     sg_feed = feed;
     if (!objc_getAssociatedObject(feed, &kFollowerKey)) {
         SGRHomeTitleFollower *follower = [SGRHomeTitleFollower new];

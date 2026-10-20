@@ -56,6 +56,8 @@ static const double kPulseUp = 0.03, kPulseDown = 0.3;
 // The luminance the hills add to the field. Under the footer's icons, where both hills lie on the field, white
 // measured 7:1 on Currents in the simulator (6:1 at the very foot); 0.08 took them to 5.3:1 and 4.8:1.
 static const CGFloat kGlow = 0.075;
+// Under Increase Contrast the field is capped lower (SGRPalette), so the hills are lit less to keep white text readable.
+static const CGFloat kGlowContrast = 0.03;
 // The glow's least saturation, for any flow color that has a hue at all (SGRColorAtLuminance): the flow colors keep
 // a dark cover's faint tint, which lifted to kGlow alone reads as silver.
 static const CGFloat kGlowSaturation = 0.6;
@@ -147,6 +149,8 @@ static CAGradientLayer *fill(CAShapeLayer *shape) {
     _crestFade.actions = noActions();
     _crestFade.colors = @[(id)UIColor.clearColor.CGColor, (id)UIColor.whiteColor.CGColor];
     _content.layer.mask = _crestFade;
+    // The masked layer is a group of its own; without this the hills' plusL would blend only inside it, not with the field.
+    _content.layer.allowsGroupBlending = NO;
     _backShape = [CAShapeLayer layer];
     _backFill = fill(_backShape);
     _backFill.opacity = 0.55f;
@@ -185,11 +189,12 @@ static CAGradientLayer *fill(CAShapeLayer *shape) {
 // lower half under its upper.
 - (void)applyColors:(NSArray<UIColor *> *)colors {
     if (colors.count < 5) return;
-    _frontFill.colors = @[(id)SGRColorAtLuminance(colors[2], kGlow, kGlowSaturation).CGColor,
-                          (id)SGRColorAtLuminance(colors[4], kGlow, kGlowSaturation).CGColor,
-                          (id)SGRColorAtLuminance(colors[3], kGlow, kGlowSaturation).CGColor];
-    _backFill.colors = @[(id)SGRColorAtLuminance(colors[0], kGlow, kGlowSaturation).CGColor,
-                         (id)SGRColorAtLuminance(colors[1], kGlow, kGlowSaturation).CGColor];
+    CGFloat glow = SGRIncreaseContrast() ? kGlowContrast : kGlow;
+    _frontFill.colors = @[(id)SGRColorAtLuminance(colors[2], glow, kGlowSaturation).CGColor,
+                          (id)SGRColorAtLuminance(colors[4], glow, kGlowSaturation).CGColor,
+                          (id)SGRColorAtLuminance(colors[3], glow, kGlowSaturation).CGColor];
+    _backFill.colors = @[(id)SGRColorAtLuminance(colors[0], glow, kGlowSaturation).CGColor,
+                         (id)SGRColorAtLuminance(colors[1], glow, kGlowSaturation).CGColor];
 }
 
 - (void)artworkChanged {

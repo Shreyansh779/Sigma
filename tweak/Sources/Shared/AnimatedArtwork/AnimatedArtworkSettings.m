@@ -36,6 +36,8 @@ NSArray *SGLockScreenMotionRows(void) {
                                                               @"and back. It takes the place of Spotify's like and dislike buttons",
                                      SGKeyLockScreenStar);
         star.visible = ^BOOL { return SGLockScreenArtwork() != SGLockArtworkOff; };
+        // Stored, then the page reloads, so the like and dislike row locks from the star's state at once.
+        star.changed = ^(BOOL on) { };
         return @[
             SGChoiceRow(@"Full-screen artwork", @"The Canvas or Apple Music's animated cover, or the lyrics a line at a time. "
                                                  @"Every song puts the cover over a moving blur of it where a song has neither",

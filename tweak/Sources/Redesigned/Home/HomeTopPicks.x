@@ -296,8 +296,8 @@ static NSInteger sg_feedSections = -1;
 static NSArray *sg_topFeed, *sg_overruled;
 static NSString *sg_overruledFrom;
 
-// One identity per section of the list from the model, nil when the model can't be read or does not match the
-// list's sections (a snapshot the list has not taken yet).
+// One identity per section of the list from the model, empty when the model can't be read or does not match the
+// list's sections (a snapshot the list has not taken yet). Empty is kept too, so a failed read is not walked again.
 static NSArray *feed(UICollectionView *list) {
     NSInteger sections = list.numberOfSections;
     if (sg_feed && sg_feedSections == sections) return sg_feed;
@@ -308,7 +308,7 @@ static NSArray *feed(UICollectionView *list) {
         [identities addObject:[heading isKindOfClass:NSArray.class] ? SGRHomeShelfIdentityFrom(heading[0], heading[1]) : NSNull.null];
     }
     SGRHomeProbeEnd(SGRHomeProbeFeed, began);
-    sg_feed = headings && (NSInteger)headings.count == sections ? identities : nil;
+    sg_feed = headings && (NSInteger)headings.count == sections ? identities : @[];
     sg_feedSections = sections;
     return sg_feed;
 }
@@ -326,6 +326,12 @@ static void feedRead(UICollectionView *list, NSInteger section, NSString *onScre
     if (!sg_feed || sg_feedSections != list.numberOfSections || section >= (NSInteger)sg_feed.count) return;
     id entry = sg_feed[section];
     if ([entry isKindOfClass:NSString.class] && [entry isEqualToString:onScreen]) return;
+    // Each (section, heading) pair is logged once, not on every measure of the cell.
+    static NSMutableSet *logged;
+    if (!logged) logged = [NSMutableSet set];
+    NSString *pair = [NSString stringWithFormat:@"%ld\n%@\n%@", (long)section, onScreen, entry];
+    if ([logged containsObject:pair]) return;
+    [logged addObject:pair];
     SGLog(@"redesign home: the feed's model moved on under section %ld (\"%@\" on screen, %@ in the model)", (long)section, onScreen, entry);
     sg_feed = nil;
 }
@@ -397,7 +403,7 @@ static void dropLarge(UICollectionView *shelf) {
         UICollectionViewLayout *layout = ((UICollectionView *)root).collectionViewLayout;
         BOOL marked = objc_getAssociatedObject(layout, &kLargeKey) != nil;
         if (marked && index != sg_topIndex) dropLarge((UICollectionView *)root);
-        onScreen = SGRHomeShelfIdentity(root);
+        onScreen = SGRHomeShelfFilterActive() ? SGRHomeShelfIdentity(root) : nil;
         if (list && onScreen) feedRead((UICollectionView *)list, attributes.indexPath.section, onScreen);
         // The same name before and after the heading comes in, so the sizes and the mark stay with the shelf.
         NSString *served = onScreen ?: (list ? feedIdentity((UICollectionView *)list, attributes.indexPath.section) : nil) ?: [@(index) stringValue];
@@ -409,6 +415,8 @@ static void dropLarge(UICollectionView *shelf) {
         }
     }
     UICollectionViewLayoutAttributes *result = %orig;
+    // Classified after the measuring: a section's root may only exist once it has been sized (HomeSections.x).
+    root = content.subviews.firstObject;
     if (list) topFromFeed((UICollectionView *)list);
     if (!shelf || ![root isKindOfClass:shelf] || result.size.height <= kHeading) {
         // The top's place holds something else now (the feed came again): the next shelf measured takes it.
