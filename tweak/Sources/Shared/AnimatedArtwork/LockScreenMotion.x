@@ -83,9 +83,10 @@ static void show(NSURL *file) {
             SGLog(@"lock motion: the system lists no key yet (%@)", MPNowPlayingInfoCenter.supportedAnimatedArtworkKeys);
             return;
         }
-        // A clip of the key's shape and size goes as it is; one smaller is cut again, scaled up (SGMotionClipOutput).
+        // A clip of the key's shape goes as it is (the crop already cut it once, so it is not scaled again); one of
+        // another shape is cut again, and scaled up (SGMotionClipOutput).
         CGSize cut = SGMotionClipCut(poster.size, ratio), written = SGMotionClipOutput(cut);
-        BOOL fits = fabs(poster.size.width / poster.size.height - ratio) <= kSameShape && CGSizeEqualToSize(written, poster.size);
+        BOOL fits = fabs(poster.size.width / poster.size.height - ratio) <= kSameShape;
         NSURL *shaped = fits ? file : SGMotionMadeFile([NSString stringWithFormat:@"cut\n%@\n%g\nv2", file.lastPathComponent, ratio]);
         if (!fits && !CGSizeEqualToSize(written, cut))
             SGLog(@"lock motion: %@ scaled up from %.0fx%.0f to %.0fx%.0f", file.lastPathComponent, cut.width, cut.height, written.width, written.height);
@@ -209,7 +210,7 @@ static NSString *pictureOf(SPTPlayerTrack *track, NSDictionary *metadata) {
 API_AVAILABLE(ios(26.0))
 static void showCover(NSString *picture) {
     if (![MPNowPlayingInfoCenter.supportedAnimatedArtworkKeys containsObject:MPNowPlayingInfoProperty3x4AnimatedArtwork]) return;
-    NSURL *file = SGMotionMadeFile([@"fluid\n" stringByAppendingString:picture]);
+    NSURL *file = SGMotionMadeFile([@"fluid\nv2\n" stringByAppendingString:picture]);
     NSString *title = sg_title;
     CGSize size = SGLyricsClipSize(SGMotionPixels());
     MPMediaItemAnimatedArtwork *artwork = [[MPMediaItemAnimatedArtwork alloc] initWithArtworkID:file.lastPathComponent
