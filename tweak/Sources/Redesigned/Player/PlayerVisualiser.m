@@ -149,8 +149,6 @@ static CAGradientLayer *fill(CAShapeLayer *shape) {
     _crestFade.actions = noActions();
     _crestFade.colors = @[(id)UIColor.clearColor.CGColor, (id)UIColor.whiteColor.CGColor];
     _content.layer.mask = _crestFade;
-    // The masked layer is a group of its own; without this the hills' plusL would blend only inside it, not with the field.
-    _content.layer.allowsGroupBlending = NO;
     _backShape = [CAShapeLayer layer];
     _backFill = fill(_backShape);
     _backFill.opacity = 0.55f;
