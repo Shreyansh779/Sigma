@@ -49,3 +49,8 @@ typedef struct {
 // Any colour made fit to be a field, the same way the edge colour is: for a colour Spotify hands over
 // before the artwork is read. Main thread.
 UIColor *SGRFieldColorFor(UIColor *color);
+
+// `color` in its own hue at the relative luminance `luminance`, its saturation lifted to at least `minSaturation`
+// when it has a hue at all (over 0.08 saturated); a black, near-black or gray one comes out gray at that luminance.
+// For the Visualizer's glow. Main thread.
+UIColor *SGRColorAtLuminance(UIColor *color, CGFloat luminance, CGFloat minSaturation);

@@ -129,6 +129,21 @@ UIColor *SGRFieldColorFor(UIColor *color) {
     return color ? fieldColorFor(color, fieldCeiling()) : SGRNeutralField();
 }
 
+// A colour with a hue that has saturation over kGrayBelow keeps it, lifted to minSaturation; below that the hue is noise.
+static const CGFloat kGrayBelow = 0.08;
+
+UIColor *SGRColorAtLuminance(UIColor *color, CGFloat luminance, CGFloat minSaturation) {
+    CGFloat h = 0, s = 0, v = 0, r = 0, g = 0, b = 0, a = 1;
+    [color getHue:&h saturation:&s brightness:&v alpha:&a];
+    if (s > kGrayBelow) color = [UIColor colorWithHue:h saturation:MAX(s, minSaturation) brightness:v alpha:1];
+    [color getRed:&r green:&g blue:&b alpha:&a];
+    CGFloat lr = toLinear(r), lg = toLinear(g), lb = toLinear(b);
+    CGFloat have = 0.2126 * lr + 0.7152 * lg + 0.0722 * lb;
+    if (have < 0.001) return [UIColor colorWithWhite:toEncoded(luminance) alpha:1];
+    CGFloat k = luminance / have;
+    return [UIColor colorWithRed:toEncoded(MIN(1, lr * k)) green:toEncoded(MIN(1, lg * k)) blue:toEncoded(MIN(1, lb * k)) alpha:1];
+}
+
 // The artwork squeezed into a small square, whatever its aspect, and the bottom rows of that averaged
 // by coverage. A bitmap context keeps its rows top to bottom, so the last rows are the bottom edge.
 static UIColor *edgeColorOf(CGImageRef image) {
