@@ -74,11 +74,11 @@ static UIImage *filled(UIImage *image, CGSize size) {
 // Diagnostic: two seconds after the artwork is set, whether the Now Playing info holds it. The system asks for the
 // clip only when it means to show it, so this tells apart "not set" from "set, but never shown".
 API_AVAILABLE(ios(26.0))
-static void confirmInfo(MPMediaItemAnimatedArtwork *artwork, NSString *key, NSString *name) {
+static void confirmInfo(NSString *identifier, NSString *key, NSString *name) {
     dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 2 * NSEC_PER_SEC), dispatch_get_main_queue(), ^{
         id held = MPNowPlayingInfoCenter.defaultCenter.nowPlayingInfo[key];
         SGLog(@"lock motion: %@ in the now playing info: %@ (artwork %@, the system lists %@)", name,
-              held ? NSStringFromClass([held class]) : @"none", artwork.artworkID, MPNowPlayingInfoCenter.supportedAnimatedArtworkKeys);
+              held ? NSStringFromClass([held class]) : @"none", identifier, MPNowPlayingInfoCenter.supportedAnimatedArtworkKeys);
     });
 }
 
@@ -121,7 +121,7 @@ static void show(NSURL *file) {
                 });
             }];
         SGNowPlayingSetExtras(@"motion", @{key: artwork}, title);
-        confirmInfo(artwork, key, @"motion");
+        confirmInfo(shaped.lastPathComponent, key, @"motion");
         SGLog(@"lock motion: %@, %.0fx%.0f, as %@%@", file.lastPathComponent, written.width, written.height,
               ratio == 1 ? @"1:1" : @"3:4", fits ? @"" : @", cut to fit");
     });
@@ -243,7 +243,7 @@ static void showCover(NSString *picture) {
             });
         }];
     SGNowPlayingSetExtras(@"motion", @{MPNowPlayingInfoProperty3x4AnimatedArtwork: artwork}, title);
-    confirmInfo(artwork, MPNowPlayingInfoProperty3x4AnimatedArtwork, @"cover");
+    confirmInfo(file.lastPathComponent, MPNowPlayingInfoProperty3x4AnimatedArtwork, @"cover");
     SGLog(@"lock motion: no moving artwork, the cover's clip offered as %@", file.lastPathComponent);
 }
 
