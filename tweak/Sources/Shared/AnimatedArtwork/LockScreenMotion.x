@@ -90,8 +90,12 @@ static void show(NSURL *file) {
         if (!fits && !CGSizeEqualToSize(written, cut))
             SGLog(@"lock motion: %@ scaled up from %.0fx%.0f to %.0fx%.0f", file.lastPathComponent, cut.width, cut.height, written.width, written.height);
         MPMediaItemAnimatedArtwork *artwork = [[MPMediaItemAnimatedArtwork alloc] initWithArtworkID:shaped.lastPathComponent
-            previewImageRequestHandler:^(CGSize wanted, void (^completion)(UIImage *)) { completion(filled(poster, wanted)); }
+            previewImageRequestHandler:^(CGSize wanted, void (^completion)(UIImage *)) {
+                SGLog(@"lock motion: %@ preview asked at %.0fx%.0f", shaped.lastPathComponent, wanted.width, wanted.height);
+                completion(filled(poster, wanted));
+            }
             videoAssetFileURLRequestHandler:^(CGSize wanted, void (^completion)(NSURL *)) {
+                SGLog(@"lock motion: %@ video asked at %.0fx%.0f", shaped.lastPathComponent, wanted.width, wanted.height);
                 if (fits) {
                     completion(file);
                     return;
@@ -217,6 +221,7 @@ static void showCover(NSString *picture) {
             });
         }
         videoAssetFileURLRequestHandler:^(CGSize wanted, void (^completion)(NSURL *)) {
+                SGLog(@"lock motion: %@ video asked at %.0fx%.0f", shaped.lastPathComponent, wanted.width, wanted.height);
             withCover(title, ^(CGImageRef cover) {
                 CFAbsoluteTime start = CFAbsoluteTimeGetCurrent();
                 BOOL ok = [NSFileManager.defaultManager fileExistsAtPath:file.path] || SGFluidClipWrite(file, cover, size);
