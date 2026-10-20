@@ -21,7 +21,9 @@
 // notice): Vitrine's export of that checkpoint for the Neural Engine (its layout (B, C, 1, S), 1x1 convolutions,
 // attention per head, an RMSNorm that divides by the row's largest value first so half precision does not overflow),
 // palettized to 6 bits. Every operation runs on the Neural Engine, and the CPU runs it too, more slowly. Its floor is
-// iOS 18, the Core ML it was built with. No audio leaves the phone.
+// iOS 18, the Core ML it was built with. No audio leaves the phone. Voice model can choose a light model instead, from
+// the same repo's separator-light.mlmodelc: the vocals of HiDolen's Mini-BS-RoFormer-18M (MIT), exported in float16
+// by Vitrine with the same input and output, smaller and less clean.
 //
 // Threading: main thread, but for what Sing.x's render side and the engine say.
 #import <UIKit/UIKit.h>
@@ -133,6 +135,24 @@ UIViewController *SGSingSettingsPage(void);
 
 #pragma mark - the model (SGSingModel.m)
 
+// Which voice model Karaoke downloads and runs, an SGSingModelKind: the full one until Light is chosen. Read live, so
+// a switch loads the other model for what plays next, without a restart.
+#define SGKeySingModel @"spotifyglass.sing.model"
+typedef NS_ENUM(NSInteger, SGSingModelKind) {
+    SGSingModelFull,    // separator-ane.mlmodelc, 210 MB: the cleanest separation
+    SGSingModelLight,   // separator-light.mlmodelc, 31 MB: Mini-BS-RoFormer-18M's vocals, for older iPhones
+};
+SGSingModelKind SGSingChosenModel(void);
+// Stored, a running download stopped (it keeps what came in for when its model is chosen again), and announced.
+void SGSetSingChosenModel(SGSingModelKind kind);
+// A model's download size, for the rows that choose it.
+NSString *SGSingModelSizeTextOf(SGSingModelKind kind);
+// The bytes the model not chosen takes on the iPhone, downloaded or partly (the old model with the full one), and
+// their removal.
+long long SGSingOtherModelBytes(void);
+void SGSingDeleteOtherModel(void);
+// Everything below is about the chosen model.
+
 typedef NS_ENUM(NSInteger, SGSingModelState) {
     SGSingModelMissing,
     SGSingModelDownloading,   // with no model to run meanwhile (the old one runs on through its update's download)
@@ -158,9 +178,9 @@ NSString *SGSingModelSizeText(void);
 void SGSingDownloadModel(void);
 void SGSingCancelModelDownload(void);
 void SGSingDeleteModel(void);
-// The compiled model's folder: separator-ane.mlmodelc once it is downloaded and checked, else the old model
-// (separator.mlmodelc) where it is still on the iPhone, else nil. On a FLEX build a copy put in Application
-// Support/Sigma/Sing/dev/ by hand comes first, unchecked.
+// The chosen model's compiled folder once it is downloaded and checked; for the full model, else the old model
+// (separator.mlmodelc) where it is still on the iPhone; else nil. On a FLEX build a copy put in Application
+// Support/Sigma/Sing/dev/<separator-ane or separator-light>.mlmodelc by hand comes first, unchecked.
 NSURL *SGSingModelURL(void);
 // The model is the old one: it runs on the CPU alone, and the download is its update.
 BOOL SGSingModelUpdateAvailable(void);
@@ -169,7 +189,7 @@ BOOL SGSingModelUpdateDownloading(void);
 // The size of the model on the iPhone now, for the row that removes it.
 NSString *SGSingModelInUseSizeText(void);
 // Deletes what the old model's download left, and the old model (separator.mlmodelc) itself once separator-ane.mlmodelc
-// is in, logging the space freed; from any thread, at launch and as the download ends.
+// is in, logging the space freed; from any thread, at launch and as the download ends. The light model is not touched.
 void SGSingRemoveOldModel(void);
 // The old model (separator.mlmodelc, from before Sigma moved to the Neural Engine one) is on the iPhone, and the
 // row that deletes it by hand: it frees SGSingOldModelSizeText(). Karaoke has no model afterwards until

@@ -134,9 +134,13 @@ Shared:
                   IPA's existing types. This bridge handles Connect only; Cast is Bonjour-declared but
                   has no equivalent packet bridge here.
     Sing/         Karaoke (Sing in the code and its keys), a song's vocals turned down while it plays (Sing.h lists
-                  its files): one voice model (Mel-Band RoFormer, MIT, exported by Vitrine for the Neural Engine and
-                  palettized to 6 bits: separator-ane.mlmodelc, 210 MB, from Hugging Face; on a FLEX build a copy in
-                  Sing/dev/ comes first) downloaded and checked file by file over Wi-Fi unless cellular is allowed,
+                  its files): the voice model Voice model chooses (spotifyglass.sing.model, read live: Best quality, the
+                  default, is Mel-Band RoFormer, MIT, exported by Vitrine for the Neural Engine and palettized to 6 bits:
+                  separator-ane.mlmodelc, 210 MB; Light is the vocals of HiDolen's Mini-BS-RoFormer-18M, MIT, in float16:
+                  separator-light.mlmodelc, 31 MB, more of the voice left in; both from Hugging Face, each with its own
+                  staging folder, resume data and paused bytes; on a FLEX build a copy of the chosen one in Sing/dev/<folder>
+                  comes first; a switch stops a running download, keeping what came in, and Sing loads the chosen model at
+                  once) downloaded and checked file by file over Wi-Fi unless cellular is allowed,
                   a stop keeping what came in for the next download to carry on from; the 489 MB model downloaded
                   before is kept and loaded on the CPU alone until this one is in (the Voice model row then reads
                   Update available), and deleted as its download ends or at a launch that finds both
