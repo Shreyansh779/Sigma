@@ -55,7 +55,7 @@ SGModRow *SGRedesignedUIRow(void) {
         SGSetRedesignedUI(on);
         offerRestart(on);
     };
-    return SGWithTile(redesign, @"sparkles", UIColor.systemPurpleColor);
+    return SGWithTile(redesign, @"sparkles", UIColor.systemIndigoColor);
 }
 
 // The stored look's own rows, then the font, which works under either look on any iOS. Redesigned UI itself
