@@ -221,14 +221,23 @@ static UIView *glassIn(UIView *header) {
 // The stack's place in the header with no transform on it (its center and bounds, which a transform leaves
 // alone): Spotify animates the stack in with a transform, and the one pass this ran in on a 440pt phone saw the
 // stack's frame half a width to the left, with no pass after to put the pill right.
-static CGRect stackPlace(UIStackView *stack) {
-    CGSize size = stack.bounds.size;
-    return CGRectMake(stack.center.x - size.width / 2, stack.center.y - size.height / 2, size.width, size.height);
+static CGRect untransformed(UIView *view) {
+    CGSize size = view.bounds.size;
+    return CGRectMake(view.center.x - size.width / 2, view.center.y - size.height / 2, size.width, size.height);
 }
 
+// The avatar's place, by its center and bounds too: it carries the scroll's transform (followScroll).
 static CGRect facePlace(UIStackView *stack, UIView *face) {
-    CGRect place = stackPlace(stack);
-    return CGRectOffset(face.frame, place.origin.x - stack.bounds.origin.x, place.origin.y - stack.bounds.origin.y);
+    CGRect place = untransformed(stack);
+    return CGRectOffset(untransformed(face), place.origin.x - stack.bounds.origin.x, place.origin.y - stack.bounds.origin.y);
+}
+
+// A view placed by bounds and center, which the scroll's transform leaves alone.
+static void place(UIView *view, CGRect frame) {
+    CGRect bounds = (CGRect){CGPointZero, frame.size};
+    CGPoint center = CGPointMake(CGRectGetMidX(frame), CGRectGetMidY(frame));
+    if (!CGRectEqualToRect(view.bounds, bounds)) view.bounds = bounds;
+    if (!CGPointEqualToPoint(view.center, center)) view.center = center;
 }
 
 static CGFloat layoutPill(UIView *header, UIStackView *stack, UIView *face) {
@@ -237,10 +246,10 @@ static CGFloat layoutPill(UIView *header, UIStackView *stack, UIView *face) {
     CGRect faceFrame = face ? facePlace(stack, face) : CGRectZero;
     CGFloat width = kPillPad + kPillButton + (face ? faceFrame.size.width + kPillPad * 2 : kPillPad);
     CGFloat maxX = face ? CGRectGetMaxX(faceFrame) + kPillPad : header.bounds.size.width - SGRSideMargin;
-    CGFloat midY = face ? CGRectGetMidY(faceFrame) : CGRectGetMidY(stackPlace(stack));
+    CGFloat midY = face ? CGRectGetMidY(faceFrame) : CGRectGetMidY(untransformed(stack));
     CGRect pill = CGRectMake(round(maxX - width), round(midY - kPillHeight / 2), width, kPillHeight);
-    if (!CGRectEqualToRect(glass.frame, pill)) glass.frame = pill;
-    if (!CGRectEqualToRect(buttons.frame, pill)) buttons.frame = pill;
+    place(glass, pill);
+    place(buttons, pill);
     CGRect filter = CGRectMake(kPillPad, 0, kPillButton, kPillHeight);
     if (!CGRectEqualToRect(buttons.filter.frame, filter)) buttons.filter.frame = filter;
     SGRGlassCapsuleInside(glass, &kPillGlassKey, pill.size, NO);
@@ -313,14 +322,38 @@ static BOOL findHeader(UIView *view) {
     return NO;
 }
 
-// The title scrolls away with the page, as the Music app's large title does: it rises with what is under it and
-// fades over its own height, so the page never passes under it. The header itself stays, the avatar with it.
+// The title row scrolls away with the page, as the Music app's large title and avatar do: the title, the glass pill
+// and Spotify's avatar rise with what is under them and fade over the title's height, so the page never passes
+// under them.
+static __weak UIView *sg_face;
+static void rise(UIView *part, CGAffineTransform transform, CGFloat alpha) {
+    if (!CGAffineTransformEqualToTransform(part.transform, transform)) part.transform = transform;
+    if (part.alpha != alpha) part.alpha = alpha;
+}
+
+// The pill's glass takes no alpha (SGRGlass.h): it rises with the row, and its material goes off once the row is
+// half faded and comes back with it.
+static BOOL sg_glassShown = YES;
+static void riseGlass(UIView *glass, CGAffineTransform transform, CGFloat alpha) {
+    if (!glass) return;
+    if (!CGAffineTransformEqualToTransform(glass.transform, transform)) glass.transform = transform;
+    BOOL shown = alpha > 0.5;
+    UIView *shape = objc_getAssociatedObject(glass, &kPillGlassKey);
+    if (!shape || shown == sg_glassShown) return;
+    sg_glassShown = shown;
+    [UIView animateWithDuration:0.15 animations:^{ SGRShowGlass(shape, shown); }];
+}
+
 static void followScroll(UIScrollView *scroll) {
     UILabel *title = sg_header ? objc_getAssociatedObject(sg_header, &kTitleKey) : nil;
     if (!title || !scroll) return;
     CGFloat scrolled = MAX(0, scroll.contentOffset.y + scroll.adjustedContentInset.top);
-    title.transform = CGAffineTransformMakeTranslation(0, -scrolled);
-    title.alpha = 1 - MIN(1, scrolled / MAX(1, title.bounds.size.height));
+    CGAffineTransform up = CGAffineTransformMakeTranslation(0, -scrolled);
+    CGFloat alpha = 1 - MIN(1, scrolled / MAX(1, title.bounds.size.height));
+    rise(title, up, alpha);
+    riseGlass(objc_getAssociatedObject(sg_header, &kGlassKey), up, alpha);
+    rise(objc_getAssociatedObject(sg_header, &kButtonsKey), up, alpha);
+    if ([sg_face isDescendantOfView:sg_header]) rise(sg_face, up, alpha);
 }
 
 @interface SGRHomeTitleFollower : NSObject
@@ -393,8 +426,11 @@ static void layoutHeader(UIViewController *page) {
         if (SGRIsAvatar(part) && !face) face = part;
         else vanish(part);
     }
-    // Brought back if an earlier pass, or an earlier build, took it for a pill.
-    if (face.alpha == 0) {
+    // A face that stopped being the avatar drops the scroll's transform and fade.
+    if (sg_face && sg_face != face) rise(sg_face, CGAffineTransformIdentity, 1);
+    sg_face = face;
+    // Brought back if an earlier pass took it for a pill (vanish). Its alpha is otherwise the scroll's (followScroll).
+    if (!face.userInteractionEnabled && face.accessibilityElementsHidden) {
         face.alpha = 1;
         face.userInteractionEnabled = YES;
         face.accessibilityElementsHidden = NO;
@@ -404,7 +440,8 @@ static void layoutHeader(UIViewController *page) {
         [stack setNeedsLayout];
     }
     [stack layoutIfNeeded];
-    // With the Home look off, the avatar stands alone in the stack and the title ends before it, as before.
+    // With the Home look off, the avatar stands alone in the stack and the title ends before it; it rises and fades
+    // with the title either way.
     CGFloat pillLeading = face ? CGRectGetMinX(facePlace(stack, face)) : header.bounds.size.width - SGRSideMargin + SGRGrid;
     if (SGRHomeLook()) {
         pillLeading = layoutPill(header, stack, face);
@@ -422,12 +459,8 @@ static void layoutHeader(UIViewController *page) {
 
     CGFloat trailing = pillLeading - SGRGrid;
     CGFloat height = ceil(font.lineHeight);
-    CGRect frame = CGRectMake(SGRSideMargin, round(CGRectGetMidY(stackPlace(stack)) - height / 2), MAX(0, trailing - SGRSideMargin), height);
-    // By bounds and center: the title carries the scroll's transform.
-    CGRect bounds = (CGRect){CGPointZero, frame.size};
-    CGPoint center = CGPointMake(CGRectGetMidX(frame), CGRectGetMidY(frame));
-    if (!CGRectEqualToRect(title.bounds, bounds)) title.bounds = bounds;
-    if (!CGPointEqualToPoint(title.center, center)) title.center = center;
+    CGRect frame = CGRectMake(SGRSideMargin, round(CGRectGetMidY(untransformed(stack)) - height / 2), MAX(0, trailing - SGRSideMargin), height);
+    place(title, frame);
     follow(view);
 
     static dispatch_once_t once;
