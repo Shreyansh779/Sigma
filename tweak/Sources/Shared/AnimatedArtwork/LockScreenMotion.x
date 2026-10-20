@@ -7,6 +7,7 @@
 //
 // The system turns down a clip of another shape than its key's, and a preview still of another shape with
 // it, so a clip that does not fit (a Canvas is mostly 9:16) is cut to the key's shape about its middle, and
+// a clip under 1440 tall is scaled up to it (SGMotionClipOutput), since the system may ignore one that small, and
 // the still is filled to the size the system asks for. The cut, like the cover's clip, is made only when the
 // lock screen asks for the video, and kept: the cut by the clip and shape, the cover's clip by the picture
 // the track names, so an album's songs share one.
@@ -82,8 +83,12 @@ static void show(NSURL *file) {
             SGLog(@"lock motion: the system lists no key yet (%@)", MPNowPlayingInfoCenter.supportedAnimatedArtworkKeys);
             return;
         }
-        BOOL fits = fabs(poster.size.width / poster.size.height - ratio) <= kSameShape;
-        NSURL *shaped = fits ? file : SGMotionMadeFile([NSString stringWithFormat:@"cut\n%@\n%g", file.lastPathComponent, ratio]);
+        // A clip of the key's shape and size goes as it is; one smaller is cut again, scaled up (SGMotionClipOutput).
+        CGSize cut = SGMotionClipCut(poster.size, ratio), written = SGMotionClipOutput(cut);
+        BOOL fits = fabs(poster.size.width / poster.size.height - ratio) <= kSameShape && CGSizeEqualToSize(written, poster.size);
+        NSURL *shaped = fits ? file : SGMotionMadeFile([NSString stringWithFormat:@"cut\n%@\n%g\nv2", file.lastPathComponent, ratio]);
+        if (!fits && !CGSizeEqualToSize(written, cut))
+            SGLog(@"lock motion: %@ scaled up from %.0fx%.0f to %.0fx%.0f", file.lastPathComponent, cut.width, cut.height, written.width, written.height);
         MPMediaItemAnimatedArtwork *artwork = [[MPMediaItemAnimatedArtwork alloc] initWithArtworkID:shaped.lastPathComponent
             previewImageRequestHandler:^(CGSize wanted, void (^completion)(UIImage *)) { completion(filled(poster, wanted)); }
             videoAssetFileURLRequestHandler:^(CGSize wanted, void (^completion)(NSURL *)) {
@@ -100,7 +105,7 @@ static void show(NSURL *file) {
                 });
             }];
         SGNowPlayingSetExtras(@"motion", @{key: artwork}, title);
-        SGLog(@"lock motion: %@, %.0fx%.0f, as %@%@", file.lastPathComponent, poster.size.width, poster.size.height,
+        SGLog(@"lock motion: %@, %.0fx%.0f, as %@%@", file.lastPathComponent, written.width, written.height,
               ratio == 1 ? @"1:1" : @"3:4", fits ? @"" : @", cut to fit");
     });
 }
