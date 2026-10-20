@@ -525,12 +525,15 @@ static void tintCard(UIView *card, UIImageView *cover) {
     SGRLargeCardParts *parts = objc_getAssociatedObject(card, &kPartsKey);
     UIImage *image = cover.image;
     if (!parts) return;
-    if (!image || !SGEnabled(SGRKeyHomeTopPicksColour)) {
+    if (!SGEnabled(SGRKeyHomeTopPicksColour)) {
         objc_setAssociatedObject(card, &kShownKey, nil, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
         setColor(parts, nil, NO);
         if (isFirstCard(card)) SGRHomeSetPageTint(nil);
         return;
     }
+    // A cover Spotify is loading again (back on Home) has no image for a moment: the colors stay until it comes,
+    // rather than the card and the page going black between.
+    if (!image) return;
     if (objc_getAssociatedObject(card, &kShownKey) == image) return;
     objc_setAssociatedObject(card, &kShownKey, image, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
     __weak UIView *weakCard = card;
