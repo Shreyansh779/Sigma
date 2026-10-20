@@ -18,6 +18,11 @@ typedef NS_ENUM(NSInteger, SGLockArtwork) {
 SGLockArtwork SGLockScreenArtwork(void);
 // How the lyrics are drawn, stored as the index of SGLyricsClipStyle (Still unless changed).
 #define SGKeyLockScreenLyricsStyle @"spotifyglass.lockscreen.lyricsStyle"
+// Off until switched on: the lock screen widget's star switches the choice between moving artwork and Lyrics
+// (Shared/LockScreenLyrics/LockScreenStar.x), and takes the place of Spotify's like and dislike buttons. StarBack is
+// the choice the star left for Lyrics, Moving artwork or Every song, to go back to.
+#define SGKeyLockScreenStar @"spotifyglass.lockscreen.star"
+#define SGKeyLockScreenStarBack @"spotifyglass.lockscreen.star.back"
 // Off until switched on: download in Low Data Mode too.
 #define SGKeyMotionLowData @"spotifyglass.motion.lowdata"
 
