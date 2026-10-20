@@ -876,7 +876,8 @@ static void showWaiting(UITableViewCell *cell, BOOL waiting, NSString *switchTit
         showWaiting(cell, [self isWaiting:row], [self switchFor:row].title);
         return cell;
     }
-    UITableViewCell *cell = SGDequeueCell(table, @"row");
+    // A checked row's cells set their own accessory and traits, which no other row resets.
+    UITableViewCell *cell = SGDequeueCell(table, row.checked ? @"checked" : @"row");
     SGFillCell(cell, row.title, row.subtitle, row.color, row.symbol);
     UIListContentConfiguration *content = (UIListContentConfiguration *)cell.contentConfiguration;
     if (SGAccessibilityTextSize() && row.value) content.secondaryText = stackedValue(row);
@@ -923,6 +924,14 @@ static void showWaiting(UITableViewCell *cell, BOOL waiting, NSString *switchTit
         cell.selectionStyle = row.action ? UITableViewCellSelectionStyleDefault : UITableViewCellSelectionStyleNone;
     } else if (row.action) {
         cell.selectionStyle = UITableViewCellSelectionStyleDefault;
+    }
+    if (row.checked) {
+        BOOL checked = row.checked();
+        // SGChoicePage's checkmark.
+        UIImageView *tick = checked ? SGSymbolView(@"checkmark", 13, UIImageSymbolWeightSemibold, 16) : nil;
+        tick.tintColor = SGGreen();
+        cell.accessoryView = tick;
+        cell.accessibilityTraits = UIAccessibilityTraitButton | (checked ? UIAccessibilityTraitSelected : 0);
     }
     BOOL waiting = [self isWaiting:row];
     showWaiting(cell, waiting, [self switchFor:row].title);
