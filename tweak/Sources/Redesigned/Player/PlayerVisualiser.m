@@ -6,10 +6,14 @@
 // (SGAudioSetOutputReader, Shared/AudioEffects/AudioEffects.h) into SGRSpectrum.m's bands. Here, on the main
 // thread, a display link reads the bands, brings them to a share of the song's own loudness (the loudest band of
 // the last few seconds at the top, so a quiet track moves as much as a loud one), eases each band up quickly
-// and down slowly, and draws two soft hills across the foot of the screen, mirrored about its middle, the bass
+// and down slowly, and draws two soft hills across the foot of the screen, mirrored about its middle, the kick
 // in the middle and the treble at either edge: a slow one behind, a quicker one in front. Each is a gradient of
-// the cover's colors (SGRPalette's flow colors, kept dark enough that white text on them stays over 5.5:1)
-// masked by a shape layer, so the render server does the drawing and the app only hands it two paths a frame.
+// the cover's colors (SGRPalette's flow colors, brought to one luminance) masked by a shape layer, so the render
+// server does the drawing and the app only hands it two paths a frame. They are light added to the field
+// (plusL), never paint over it, so a dark cover's hills are a silver mist and a bright field's are brighter
+// still, and the whole fades to clear toward the tallest crest, so a peak thins to light instead of ending in an
+// edge. The front hill brightens on the kick and dims over a third of a second: the beat, where the heights are
+// the spectrum.
 //
 // It moves only while it is in a window, Spotify is in front, the player is not opening or closing, Low Power
 // Mode is off and the song plays; a pause lets the hills settle and the link stops, and nothing is read from
@@ -31,22 +35,40 @@
 #import "Player.h"
 #import "SGRSpectrum.h"
 
-enum { kBands = SGRSpectrumBands, kPoints = 2 * kBands - 1 };
+// The two bands under 80 Hz stay out of the picture: sub-bass is quieter than the kick above it in most mixes,
+// so drawn at the middle it cut a notch into the crest right under the play button.
+enum { kBands = SGRSpectrumBands, kFirst = 2, kShown = kBands - kFirst, kPoints = 2 * kShown - 1 };
+// The kick: the four bands from kFirst, 80 to 205 Hz; beside it the next six, 205 to 840 Hz.
+enum { kKickBands = 4, kBesideBands = 6 };
 // The loudness a band is drawn against: the loudest band of late at the top, kRange dB under it at the floor,
 // the top falling kPeakFall dB a second after a loud passage and never under kPeakFloor, so silence stays flat.
-static const float kRange = 40, kPeakFall = 4, kPeakFloor = -60;
+// 30 dB rather than more: a modern mix keeps every band within 40 of the loudest, which drew one flat plateau.
+static const float kRange = 30, kPeakFall = 4, kPeakFloor = -60;
 // A rise toward the treble, in dB a band (three bands an octave), since music has less there: a tuning knob.
 static const float kTilt = 0.6f;
 // How quickly a band eases toward its level, up and down, in seconds; the hill behind is slower. With Reduce
 // Motion both ease over kStillEase.
-static const double kFrontUp = 0.08, kFrontDown = 0.4, kBackUp = 0.3, kBackDown = 0.9, kStillEase = 3;
+static const double kFrontUp = 0.12, kFrontDown = 0.5, kBackUp = 0.3, kBackDown = 0.9, kStillEase = 3;
+// The beat: the kick's bands within kPulseRange dB of the peak light the front hill up, at once,
+// and it dims again over kPulseDown; the hill never goes under kPulseFloor of its brightness.
+static const float kPulseRange = 10, kPulseFloor = 0.5f;
+static const double kPulseUp = 0.03, kPulseDown = 0.3;
+// The luminance the hills add to the field. Under the footer's icons, where both hills lie on the field, white
+// measured 7:1 on Currents in the simulator (6:1 at the very foot); 0.08 took them to 5.3:1 and 4.8:1.
+static const CGFloat kGlow = 0.075;
+// The glow's least saturation, for any flow color that has a hue at all (SGRColorAtLuminance): the flow colors keep
+// a dark cover's faint tint, which lifted to kGlow alone reads as silver.
+static const CGFloat kGlowSaturation = 0.6;
 // No new bands for this long reads as silence (a pause, a stall, a tap that never ran).
 static const double kStale = 0.3;
 // The hills' height at their tallest and at rest, as shares of the screen's height; the one behind is taller.
-static const CGFloat kFrontHeight = 0.24, kBackHeight = 0.3, kRestHeight = 0.012;
+static const CGFloat kFrontHeight = 0.2, kBackHeight = 0.26, kRestHeight = 0.008;
+// The crest fade: the hills are opaque from kFadeFoot of the screen's height over the foot and clear from
+// kFadeTop up, so the front hill at its tallest and the back one's crests dissolve into the field.
+static const CGFloat kFadeFoot = 0.04, kFadeTop = 0.2;
 // Below this every band has settled (under 2 pt at the top of the front hill), and a paused song's link can stop.
 static const float kSettled = 0.02f;
-// Each band shares this much with either neighbor, twice over, so one loud band is a hill and not a spike.
+// Each band shares this much with either neighbor, three times over, so one loud band is a hill and not a spike.
 static const float kSpread = 0.25f;
 static const NSTimeInterval kTransitionSlack = 0.05;
 
@@ -89,10 +111,11 @@ static NSDictionary *noActions(void) {
     UIView *_content;   // the hills, faded in and out as one
     CAGradientLayer *_backFill, *_frontFill;
     CAShapeLayer *_backShape, *_frontShape;
+    CAGradientLayer *_crestFade;   // the content's mask: clear at the tallest crest, opaque over the foot
     UIVisualEffectView *_lyricsBlur;
     CADisplayLink *_link;
     BOOL _reading, _idle;
-    float _front[kBands], _back[kBands], _peak;
+    float _front[kBands], _back[kBands], _peak, _pulse;
     uint64_t _generation;
     CFTimeInterval _fresh, _last;
     NSUInteger _palette;
@@ -108,6 +131,7 @@ static CAGradientLayer *fill(CAShapeLayer *shape) {
     layer.actions = noActions();
     layer.startPoint = CGPointMake(0, 0.5);
     layer.endPoint = CGPointMake(1, 0.5);
+    layer.compositingFilter = @"plusL";
     shape.actions = noActions();
     layer.mask = shape;
     return layer;
@@ -119,6 +143,10 @@ static CAGradientLayer *fill(CAShapeLayer *shape) {
     self.accessibilityElementsHidden = YES;
     _peak = kPeakFloor;
     _content = [[UIView alloc] initWithFrame:frame];
+    _crestFade = [CAGradientLayer layer];
+    _crestFade.actions = noActions();
+    _crestFade.colors = @[(id)UIColor.clearColor.CGColor, (id)UIColor.whiteColor.CGColor];
+    _content.layer.mask = _crestFade;
     _backShape = [CAShapeLayer layer];
     _backFill = fill(_backShape);
     _backFill.opacity = 0.55f;
@@ -157,8 +185,11 @@ static CAGradientLayer *fill(CAShapeLayer *shape) {
 // lower half under its upper.
 - (void)applyColors:(NSArray<UIColor *> *)colors {
     if (colors.count < 5) return;
-    _frontFill.colors = @[(id)colors[2].CGColor, (id)colors[4].CGColor, (id)colors[3].CGColor];
-    _backFill.colors = @[(id)colors[0].CGColor, (id)colors[1].CGColor];
+    _frontFill.colors = @[(id)SGRColorAtLuminance(colors[2], kGlow, kGlowSaturation).CGColor,
+                          (id)SGRColorAtLuminance(colors[4], kGlow, kGlowSaturation).CGColor,
+                          (id)SGRColorAtLuminance(colors[3], kGlow, kGlowSaturation).CGColor];
+    _backFill.colors = @[(id)SGRColorAtLuminance(colors[0], kGlow, kGlowSaturation).CGColor,
+                         (id)SGRColorAtLuminance(colors[1], kGlow, kGlowSaturation).CGColor];
 }
 
 - (void)artworkChanged {
@@ -205,6 +236,7 @@ static CAGradientLayer *fill(CAShapeLayer *shape) {
     _frontFill.frame = bounds;
     _backShape.frame = bounds;
     _frontShape.frame = bounds;
+    _crestFade.frame = bounds;
     [self draw];
 }
 
@@ -316,9 +348,15 @@ static float ease(float value, float target, double dt, double up, double down) 
     }
     if (!silent) _peak = fmaxf(fmaxf(loudest, _peak - kPeakFall * (float)dt), kPeakFloor);
     BOOL still = SGRReduceMotion();
-    float targets[kBands];
+    float targets[kBands], kick = kPeakFloor;
     for (int band = 0; band < kBands; band++) targets[band] = silent ? 0 : fminf(1, fmaxf(0, (levels[band] - (_peak - kRange)) / kRange));
-    for (int pass = 0; pass < 2; pass++) {
+    for (int band = kFirst; band < kFirst + kKickBands; band++) kick = fmaxf(kick, levels[band]);
+    // The middle is a mound and never a valley: between kicks the kick's bands stand as tall as the bands beside
+    // them (kBesideBands up), so the centre sinks only with the hills on either side and never under them.
+    float beside = 0;
+    for (int band = kFirst + kKickBands; band < kFirst + kKickBands + kBesideBands; band++) beside = fmaxf(beside, targets[band]);
+    for (int band = kFirst; band < kFirst + kKickBands; band++) targets[band] = fmaxf(targets[band], beside);
+    for (int pass = 0; pass < 3; pass++) {
         float before = targets[0];
         for (int band = 0; band < kBands; band++) {
             float here = targets[band], next = targets[MIN(band + 1, kBands - 1)];
@@ -331,6 +369,8 @@ static float ease(float value, float target, double dt, double up, double down) 
         _front[band] = ease(_front[band], target, dt, still ? kStillEase : kFrontUp, still ? kStillEase : kFrontDown);
         _back[band] = ease(_back[band], target, dt, still ? kStillEase : kBackUp, still ? kStillEase : kBackDown);
     }
+    float beat = silent ? 0 : fminf(1, fmaxf(0, (kick - (_peak - kPulseRange)) / kPulseRange));
+    _pulse = ease(_pulse, beat, dt, still ? kStillEase : kPulseUp, still ? kStillEase : kPulseDown);
     [self draw];
     BOOL idle = silent && self.settled;
     if (idle && !_idle) {
@@ -367,7 +407,7 @@ static CGPathRef hillPath(const CGPoint *points, int count, CGFloat foot) {
 static void shape(CAShapeLayer *layer, const float *bands, CGFloat width, CGFloat baseline, CGFloat foot, CGFloat tallest, CGFloat rest) {
     CGPoint points[kPoints];
     for (int i = 0; i < kPoints; i++) {
-        float value = bands[abs(i - (kBands - 1))];
+        float value = bands[kFirst + abs(i - (kShown - 1))];
         CGFloat height = rest + (tallest - rest) * powf(value, 1.2f);
         points[i] = CGPointMake(width * i / (kPoints - 1), baseline - height);
     }
@@ -378,7 +418,7 @@ static void shape(CAShapeLayer *layer, const float *bands, CGFloat width, CGFloa
 
 - (void)draw {
     CGRect bounds = self.bounds;
-    if (bounds.size.width <= 0) return;
+    if (bounds.size.width <= 0 || bounds.size.height <= 0) return;
     CGFloat baseline = _baseline > 0 ? _baseline : bounds.size.height;
     CGFloat screen = _screenHeight > 0 ? _screenHeight : bounds.size.height;
     CGFloat foot = MAX(baseline, bounds.size.height), rest = round(screen * kRestHeight);
@@ -386,6 +426,9 @@ static void shape(CAShapeLayer *layer, const float *bands, CGFloat width, CGFloa
     [CATransaction setDisableActions:YES];
     shape(_backShape, _back, bounds.size.width, baseline, foot, screen * kBackHeight, rest * 1.5);
     shape(_frontShape, _front, bounds.size.width, baseline, foot, screen * kFrontHeight, rest);
+    _frontFill.opacity = kPulseFloor + (1 - kPulseFloor) * _pulse;
+    _crestFade.startPoint = CGPointMake(0.5, (baseline - screen * kFadeTop) / bounds.size.height);
+    _crestFade.endPoint = CGPointMake(0.5, (baseline - screen * kFadeFoot) / bounds.size.height);
     [CATransaction commit];
 }
 
