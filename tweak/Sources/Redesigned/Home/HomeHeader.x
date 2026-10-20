@@ -370,13 +370,8 @@ static void followScroll(UIScrollView *scroll) {
 // than the page, and a shelf's offset never moves the title. Followed by an observer that lives as long as it does.
 static char kFollowerKey;
 static __weak UIScrollView *sg_feed;
-static void follow(UIView *view) {
-    __block UIScrollView *feed = sg_feed;
-    if (![feed isDescendantOfView:view]) feed = nil;
-    if (!feed) SGForEachView(view, ^(UIView *v) {
-        if (!feed && [v isKindOfClass:UIScrollView.class] && v.bounds.size.height > 300) feed = (UIScrollView *)v;
-    });
-    if (!feed) return;
+static __weak UIView *sg_pageView;
+static void followFeed(UIScrollView *feed) {
     sg_feed = feed;
     if (!objc_getAssociatedObject(feed, &kFollowerKey)) {
         SGRHomeTitleFollower *follower = [SGRHomeTitleFollower new];
@@ -385,6 +380,15 @@ static void follow(UIView *view) {
         objc_setAssociatedObject(feed, &kFollowerKey, follower, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
     }
     followScroll(feed);
+}
+
+static void follow(UIView *view) {
+    __block UIScrollView *feed = sg_feed;
+    if (![feed isDescendantOfView:view]) feed = nil;
+    if (!feed) SGForEachView(view, ^(UIView *v) {
+        if (!feed && [v isKindOfClass:UIScrollView.class] && v.bounds.size.height > 300) feed = (UIScrollView *)v;
+    });
+    if (feed) followFeed(feed);
 }
 
 static void layoutHeader(UIViewController *page);
@@ -416,6 +420,7 @@ static void layoutHeaderOnceSized(UIViewController *page, UIView *header) {
 static void layoutHeader(UIViewController *page) {
     UIView *view = page.viewIfLoaded;
     if (!view || !findHeader(view)) return;
+    sg_pageView = view;
     UIView *header = sg_header;
     UIStackView *stack = sg_stack;
     vanish(sg_scrim);
@@ -471,6 +476,23 @@ static void layoutHeader(UIViewController *page) {
     });
 }
 
+// The feed can come after the header's last pass (its page loads while the header is laid out, a few seconds on
+// a slow account), and the page's view has no pass of its own after; a feed that replaces another (a filter) comes
+// while the old one is still in the window. The feed's own controller hands it the follower on each of its passes.
+%hook _TtC16Home_EvoPageImpl33EvoLoadableResourceViewController
+- (void)viewDidLayoutSubviews {
+    %orig;
+    UIView *view = ((UIViewController *)self).viewIfLoaded;
+    if (!sg_pageView || !view.window || ![view isDescendantOfView:sg_pageView]) return;
+    for (UIView *sub in view.subviews) {
+        if ([sub isKindOfClass:UICollectionView.class]) {
+            if (sub != sg_feed) followFeed((UIScrollView *)sub);
+            break;
+        }
+    }
+}
+%end
+
 %hook _TtC19Home_FunkisPageImpl20FunkisViewController
 - (void)viewDidLayoutSubviews {
     %orig;
@@ -490,6 +512,7 @@ static void layoutHeader(UIViewController *page) {
     %init;
     SGRequireClasses(@[
         @"_TtC19Home_FunkisPageImpl20FunkisViewController",
+        @"_TtC16Home_EvoPageImpl33EvoLoadableResourceViewController",
         @"_TtC29ListeningActivity_ElementsKit21AdaptiveFaceContainer",
     ]);
 }
