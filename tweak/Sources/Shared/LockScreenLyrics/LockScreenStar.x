@@ -12,6 +12,7 @@
 static NSString *const kLikeDislikeFlag = @"ios-feature-lockscreen.like_dislike_enabled";
 static MPFeedbackCommand *sg_like;   // the command while the star is on it, else nil
 static id sg_target;
+static NSString *sg_title;           // the command's title before the star, put back when it goes off
 
 static BOOL starOn(void) {
     return SGHidden(SGKeyLockScreenStar) && SGLockScreenArtwork() != SGLockArtworkOff;
@@ -53,6 +54,7 @@ static void arm(void) {
         sg_like = nil;
         like.enabled = NO;
         like.active = NO;
+        like.localizedTitle = sg_title;
         SGLog(@"lock star: off");
         return;
     }
@@ -60,6 +62,7 @@ static void arm(void) {
         // Spotify's handler, if the flag had it on one, would like the song on the same tap.
         [like removeTarget:nil];
         sg_target = [like addTargetWithHandler:^MPRemoteCommandHandlerStatus(MPRemoteCommandEvent *event) { return tapped(); }];
+        sg_title = like.localizedTitle;
         like.localizedTitle = @"Lock screen lyrics";
         sg_like = like;
         SGLog(@"lock star: on the like command");
@@ -82,7 +85,11 @@ static void arm(void) {
 - (void)removeTarget:(id)target {
     if (sg_like && self == sg_like && target != sg_target) {
         SGLog(@"lock star: Spotify took %@ off the like command", target ? @"its handler" : @"every handler");
-        if (!target) sg_like = nil;
+        if (!target) {
+            // Spotify cleared every handler: the star is armed again on the main thread, after this call.
+            sg_like = nil;
+            dispatch_async(dispatch_get_main_queue(), ^{ arm(); });
+        }
     }
     %orig;
 }

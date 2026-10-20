@@ -561,6 +561,15 @@ static void styleNowPlayingBar(UIViewController *container) {
 }
 %end
 
+// Spotify's save button flag, forced off while the redesign's own "Hide the like button" switch is on. The native
+// look's save button row writes the same flag under its own key, so the redesign keeps its switch on its own key.
+%ctor {
+    SGFlagForcer hidesLike = ^id(NSString *key) {
+        return SGRedesignedUIStored() && SGHidden(SGRKeyBarHideLike) && [key isEqualToString:@"ios-feature-nowplayingbar.add_button"] ? @NO : nil;
+    };
+    SGRegisterFlagForcer(YES, hidesLike, hidesLike);
+}
+
 %ctor {
     if (!SGRedesignedUI()) return;
     %init;

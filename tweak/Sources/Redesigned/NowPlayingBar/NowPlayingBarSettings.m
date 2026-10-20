@@ -19,7 +19,7 @@ NSArray<SGModRow *> *SGRNowPlayingBarRows(void) {
         minimize,
         inlineConnect,
         SGHideRow(@"Hide the device button", @"On the full now playing bar", SGRHideBarConnect),
-        // Spotify's own flag for the bar's save button, forced off: Spotify leaves the button out.
-        SGKillRow(@"Hide the like button", @"ios-feature-nowplayingbar.add_button"),
+        // The redesign's own switch; the flag it forces is Spotify's, and the native look's save button reads the same one.
+        SGSwitchRow(@"Hide the like button", @"On the full now playing bar", SGRKeyBarHideLike),
     ];
 }
