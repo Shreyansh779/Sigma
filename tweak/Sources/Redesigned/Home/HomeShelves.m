@@ -77,11 +77,14 @@ static NSString *trimmed(UILabel *label) {
     return [label.text stringByTrimmingCharactersInSet:NSCharacterSet.whitespaceCharacterSet];
 }
 
+NSString *SGRHomeShelfIdentityFrom(NSString *small, NSString *title) {
+    return small.length ? [small stringByAppendingString:@" …"] : title;
+}
+
 NSString *SGRHomeShelfIdentity(UIView *shelf) {
     UILabel *title = nil, *over = nil;
     if (!headingLabels(shelf, &title, &over)) return nil;
-    NSString *small = trimmed(over);
-    return small.length ? [small stringByAppendingString:@" …"] : trimmed(title);
+    return SGRHomeShelfIdentityFrom(trimmed(over), trimmed(title));
 }
 
 NSString *SGRHomeShelfTitle(UIView *shelf) {

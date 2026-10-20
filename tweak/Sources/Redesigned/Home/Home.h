@@ -6,6 +6,7 @@
 //                      stay only when switched on; episode cards and any new kind collapse. The DJ loses its
 //                      heading, and the flags the redesign forces on Home
 //     HomeShelves.m    a shelf's identity from its heading, the shelves seen lately and which are hidden
+//     HomeFeed.swift   every section's shelf identity from Spotify's model of the feed, built or not
 //     HomeSettings.m   the Home page of Mod Settings: Top picks, what stays on Home, one switch per shelf
 //     HomeHeader.x     a large title where the filter pills were, the avatar at the trailing edge, no scrim
 //     HomeHeadings.x   the shelves' headings in the Music app's size, drawn over Spotify's
@@ -53,6 +54,8 @@ UIViewController *SGRHomeSettingsPage(void);   // for Mod Settings (App/ModSetti
 // the small line over the title when there is one ("More like …", for any artist), else the title ("Recents",
 // an artist's name). nil while the shelf has no heading to read. Language-bound, as the headings are.
 NSString *SGRHomeShelfIdentity(UIView *shelf);
+// The identity a heading of these two lines gives: "More like …" for "More like" over "Chief Keef", else the title.
+NSString *SGRHomeShelfIdentityFrom(NSString *small, NSString *title);
 NSString *SGRHomeShelfTitle(UIView *shelf);        // the heading's title alone ("Chief Keef" under "More like")
 void SGRHomeNoteShelf(NSString *identity);         // seen on Home now
 NSArray<NSString *> *SGRHomeShelvesSeen(void);     // seen within 30 days, in the order first seen
@@ -109,6 +112,7 @@ typedef NS_ENUM(NSUInteger, SGRHomeProbe) {
     SGRHomeProbeShelfLayout,     // the shelf's layoutSubviews hook (TouchCancellingCollectionView)
     SGRHomeProbeLargeCard,       // SGRHomeStyleLargeCard
     SGRHomeProbeTint,            // SGRHomeTintForCover asks (cache misses go off the main thread)
+    SGRHomeProbeFeed,            // the walk of the feed's model for the shelves' headings (HomeFeed.swift)
     SGRHomeProbeCount,
 };
 CFTimeInterval SGRHomeProbeBegin(void);
