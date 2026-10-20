@@ -133,7 +133,6 @@ static CAGradientLayer *fill(CAShapeLayer *shape) {
     layer.actions = noActions();
     layer.startPoint = CGPointMake(0, 0.5);
     layer.endPoint = CGPointMake(1, 0.5);
-    layer.compositingFilter = @"plusL";
     shape.actions = noActions();
     layer.mask = shape;
     return layer;
@@ -149,6 +148,8 @@ static CAGradientLayer *fill(CAShapeLayer *shape) {
     _crestFade.actions = noActions();
     _crestFade.colors = @[(id)UIColor.clearColor.CGColor, (id)UIColor.whiteColor.CGColor];
     _content.layer.mask = _crestFade;
+    // The blend is the masked group's, so the two hills add light to the field behind them, not to each other.
+    _content.layer.compositingFilter = @"plusL";
     _backShape = [CAShapeLayer layer];
     _backFill = fill(_backShape);
     _backFill.opacity = 0.55f;
