@@ -12,8 +12,8 @@
 // the track names, so an album's songs share one.
 //
 // The choice is read on every track, and a change applies at once: Off takes the clip away, Moving artwork
-// and Every song look the playing track up. Lyrics is LyricsArtwork.x's, which reads it only at launch, so
-// a launch with Lyrics leaves this off until the next one.
+// and Every song look the playing track up. Lyrics is LyricsArtwork.x's, which reads it the same way, so the
+// lock screen widget's star (Shared/LockScreenLyrics/LockScreenStar.x) can swap the two without a restart.
 #import <MediaPlayer/MediaPlayer.h>
 #import "Core/SGCore.h"
 #import "AnimatedArtwork.h"
