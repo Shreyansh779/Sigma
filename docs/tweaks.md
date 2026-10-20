@@ -581,8 +581,9 @@ player as the playing track shows on it and a control for the Background behind 
 held still (Kit/SGRField.m's backdrop); Colors, its colours drifting (Kit/SGRFlow.m); Fluid artwork, the default, the cover itself
 blurred and slowly turning (Kit/SGRFluid.m, five sliders: Speed, Warp, Blur, Saturation and Brightness, with Reset); the
 Visualizer, a calm spectrum of what plays in two soft hills of the cover's colours over Fluid artwork held still (PlayerVisualiser.m,
-SGRSpectrum.m: Spotify's output read through the audio effects' notify, 24 bands, drawn at 60 frames a second, 30 behind the lyrics,
-stopped in Low Power Mode and with Reduce Motion on), or Animated
+SGRSpectrum.m: Spotify's output read through the audio effects' notify, 24 bands, the two under 80 Hz left out, the kick a mound in the
+middle, the front hill brightening on it; the colours added as light at one luminance (plusL, SGRColorAtLuminance), clear toward the
+tallest crest; drawn at 60 frames a second, 30 behind the lyrics, stopped in Low Power Mode and with Reduce Motion on), or Animated
 artwork, the track's Canvas or the album's Apple Music 3:4 cover looping muted over it (Redesigned/Player/PlayerAnimated.x), the square cover fading out as it fades in and back as it goes, found
 the lock screen's way in an order of its own (a Sources page) and falling back to Fluid artwork for a track
 without a clip, while one is fetched, while Spotify shows its own music video, and in Low Power Mode or with Reduce Motion on; the
