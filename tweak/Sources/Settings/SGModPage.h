@@ -50,6 +50,9 @@
 @property (nonatomic, copy) NSArray<NSString *> *menu;
 // A small rounded square of this color before the row's value.
 @property (nonatomic, copy) UIColor *(^swatch)(void);
+// One of a few rows picked from on the page itself (an action row each): a checkmark against it while this answers
+// YES, read as the row is drawn, so its action reloads the table.
+@property (nonatomic, copy) BOOL (^checked)(void);
 @end
 
 @interface SGModSection : NSObject

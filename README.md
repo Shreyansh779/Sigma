@@ -102,7 +102,9 @@ page.
 
 The Sing voice model is Mel-Band RoFormer (Ju-Chiang Wang, Wei-Tsung Lu, Minz Won) with
 KimberleyJensen's vocal checkpoint (MIT), exported for the Neural Engine by Vitrine and downloaded from
-[its Hugging Face repo](https://huggingface.co/My-Name-Is-Jeff/vitrine-sing).
+[its Hugging Face repo](https://huggingface.co/My-Name-Is-Jeff/vitrine-sing). Voice model can choose a light model
+instead: the vocals of HiDolen's [Mini-BS-RoFormer-18M](https://huggingface.co/HiDolen/Mini-BS-RoFormer-18M) (MIT),
+exported in float16 by Vitrine, for older iPhones.
 
 ## License
 
