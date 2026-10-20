@@ -419,7 +419,8 @@ Redesigned:
                   the bar half way `turns`, a minimize from inside Spotify's own animations `nested`, every frame of
                   the move sampled `motion`), the scroll's steps checked by harness/tabbar/minimize-check.c
     NowPlayingBar/ the glass now playing bar (NowPlayingBar.x), with Spotify's device button on it hidden on request
-                  (BarConnect.x, its own key and its own row on the Player page, apart from the native look's). The card's text is the Music
+                  (BarConnect.x, its own key and its own row on the Player page, apart from the native look's), and its like
+                  button hidden too (Spotify's own flag ios-feature-nowplayingbar.add_button forced off). The card's text is the Music
                   app's, the title over the artists with no device line, drawn inside Spotify's own text on each swipe page
                   so it slides and fades with it; Spotify lays a page out as "title • artists" over the device line or as
                   title over artists, and both are read. In the minimized row
