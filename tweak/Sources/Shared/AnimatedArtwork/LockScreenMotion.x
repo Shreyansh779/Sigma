@@ -222,7 +222,7 @@ static NSString *pictureOf(SPTPlayerTrack *track, NSDictionary *metadata) {
 API_AVAILABLE(ios(26.0))
 static void showCover(NSString *picture) {
     if (![MPNowPlayingInfoCenter.supportedAnimatedArtworkKeys containsObject:MPNowPlayingInfoProperty3x4AnimatedArtwork]) return;
-    NSURL *file = SGMotionMadeFile([@"fluid\nv3\n" stringByAppendingString:picture]);
+    NSURL *file = SGMotionMadeFile([@"fluid\nv4\n" stringByAppendingString:picture]);
     NSString *title = sg_title;
     CGSize size = SGLyricsClipSize(SGMotionPixels());
     MPMediaItemAnimatedArtwork *artwork = [[MPMediaItemAnimatedArtwork alloc] initWithArtworkID:file.lastPathComponent
