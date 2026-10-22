@@ -11,6 +11,16 @@ static double sg_elapsed, sg_rate;
 static CFAbsoluteTime sg_clockAt;
 static NSString *sg_lastMiss;   // the last incoming title logged as dropping an owner, so a stream is one line
 
+// Spotify republishes the info with the title sometimes padded with a trailing space, and some partial
+// updates carry no title at all; neither is a track change, so the extras ride on both. A real change brings
+// a different title and drops them (the follower has already cleared the old track's extras by then).
+static BOOL sg_sameTitle(id incoming, NSString *stored) {
+    if (![incoming isKindOfClass:NSString.class]) return YES;   // a title-less update is the same track
+    NSCharacterSet *ws = NSCharacterSet.whitespaceAndNewlineCharacterSet;
+    return [[(NSString *)incoming stringByTrimmingCharactersInSet:ws]
+            isEqualToString:[stored stringByTrimmingCharactersInSet:ws] ?: @""];
+}
+
 // `stale` are an owner's old keys: the info the getter gives back can still carry them, and the hook puts
 // back only the extras that are current.
 static void resend(NSArray *stale) {
@@ -59,7 +69,7 @@ void SGNowPlayingSetExtras(NSString *owner, NSDictionary *extras, NSString *titl
         }
         id title = info[MPMediaItemPropertyTitle];
         for (NSString *owner in sg_extras) {
-            if (![title isEqual:sg_titles[owner]]) {
+            if (!sg_sameTitle(title, sg_titles[owner])) {
                 missOwner = owner; missStored = sg_titles[owner]; missIncoming = title;
                 continue;
             }
