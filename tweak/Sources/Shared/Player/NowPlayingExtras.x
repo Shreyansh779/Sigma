@@ -9,6 +9,7 @@ static NSMutableDictionary<NSString *, NSDictionary *> *sg_extras;   // by owner
 static NSMutableDictionary<NSString *, NSString *> *sg_titles;       // by owner
 static double sg_elapsed, sg_rate;
 static CFAbsoluteTime sg_clockAt;
+static NSString *sg_lastMiss;   // the last incoming title logged as dropping an owner, so a stream is one line
 
 // `stale` are an owner's old keys: the info the getter gives back can still carry them, and the hook puts
 // back only the extras that are current.
@@ -47,6 +48,7 @@ void SGNowPlayingSetExtras(NSString *owner, NSDictionary *extras, NSString *titl
 %hook MPNowPlayingInfoCenter
 - (void)setNowPlayingInfo:(NSDictionary *)info {
     NSMutableDictionary *added = nil;
+    NSString *missOwner = nil, *missStored = nil, *missIncoming = nil;   // a pending owner this update drops
     @synchronized (sg_lock) {
         if (info[MPNowPlayingInfoPropertyElapsedPlaybackTime]) {
             sg_elapsed = [info[MPNowPlayingInfoPropertyElapsedPlaybackTime] doubleValue];
@@ -57,11 +59,24 @@ void SGNowPlayingSetExtras(NSString *owner, NSDictionary *extras, NSString *titl
         }
         id title = info[MPMediaItemPropertyTitle];
         for (NSString *owner in sg_extras) {
-            if (![title isEqual:sg_titles[owner]]) continue;
+            if (![title isEqual:sg_titles[owner]]) {
+                missOwner = owner; missStored = sg_titles[owner]; missIncoming = title;
+                continue;
+            }
             if (!added) added = [NSMutableDictionary dictionary];
             [added addEntriesFromDictionary:sg_extras[owner]];
         }
+        // Diagnostic: this update's title matches no pending owner, so that owner's extras ride no further.
+        // Suppressed once logged for a title, so position updates for the same mismatch stay one line.
+        if (missStored) {
+            NSString *mark = missIncoming ?: @"";
+            if ([mark isEqual:sg_lastMiss]) missStored = nil;
+            else sg_lastMiss = mark;
+        }
     }
+    if (missStored)
+        SGLog(@"lock motion: now playing titled %@ matches no pending %@ (\"%@\"), its extras drop",
+              missIncoming ? [NSString stringWithFormat:@"\"%@\"", missIncoming] : @"(none)", missOwner, missStored);
     if (!added) {
         %orig;
         return;
