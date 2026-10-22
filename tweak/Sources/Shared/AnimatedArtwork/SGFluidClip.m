@@ -22,10 +22,9 @@ static const CGFloat kBlurSide = 128, kBlurRadius = 10, kSaturation = 1.5, kBrig
 static const CGFloat kShadeFrom = 0.55, kShadeAlpha = 0.45;
 // The cover's side as a share of the clip's width, and its center's height from the top. The lock screen
 // aspect-fills a 3:4 clip on a phone's taller screen, which can crop its sides off (about 61% of the width shows on
-// a 19.5:9 phone). Measured on a lock screen: the clip is shown 93% of the screen's width, and the cover at
-// 0.856 of it, centered 0.407 down, is the size and place of the plain cover (468 pt wide, centered 478 of 1280).
-// ponytail: guessed from the screen's shape, as SGLyricsClip.m's column is; tune both on a device.
-static const CGFloat kCoverSide = 0.856, kCoverY = 0.407, kCoverRadius = 0.035, kShadowBlur = 0.08;
+// a 19.5:9 phone), so a cover at 1.0 runs to the clip's edges, filling the card as the plain cover does with no
+// fluid. ponytail: guessed from the screen's shape, as SGLyricsClip.m's column is; tune both on a device.
+static const CGFloat kCoverSide = 1.0, kCoverY = 0.45, kCoverRadius = 0.035, kShadowBlur = 0.08;
 // An eight second loop: long enough that the sway reads as slow, short enough to write in a few seconds.
 static const int32_t kLoopSeconds = 8, kFPS = 24;
 
