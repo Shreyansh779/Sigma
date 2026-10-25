@@ -6,18 +6,19 @@
 #import "SpeedPitchImpl.h"
 #import "Shared/Audio/SGAudioPipeline.h"
 
-static inline BOOL pipe(void) { return SGAudioPipelineEnabled(); }
+// Not `pipe` — that is POSIX pipe(2) from <unistd.h>, pulled in transitively.
+static inline BOOL onPipeline(void) { return SGAudioPipelineEnabled(); }
 
-double SGPlayerSpeed(void) { return pipe() ? SGPlayerSpeedPipeline() : SGPlayerSpeedLegacy(); }
-void SGSetPlayerSpeed(double speed) { if (pipe()) SGSetPlayerSpeedPipeline(speed); else SGSetPlayerSpeedLegacy(speed); }
-BOOL SGPlayerSpeedAllowed(void) { return pipe() ? SGPlayerSpeedAllowedPipeline() : SGPlayerSpeedAllowedLegacy(); }
-float SGPlayerPitch(void) { return pipe() ? SGPlayerPitchPipeline() : SGPlayerPitchLegacy(); }
-void SGSetPlayerPitch(float semitones) { if (pipe()) SGSetPlayerPitchPipeline(semitones); else SGSetPlayerPitchLegacy(semitones); }
-BOOL SGPlayerPitchAvailable(void) { return pipe() ? SGPlayerPitchAvailablePipeline() : SGPlayerPitchAvailableLegacy(); }
-BOOL SGPlayerPitchFollowsSpeed(void) { return pipe() ? SGPlayerPitchFollowsSpeedPipeline() : SGPlayerPitchFollowsSpeedLegacy(); }
-void SGSetPlayerPitchFollowsSpeed(BOOL follows) { if (pipe()) SGSetPlayerPitchFollowsSpeedPipeline(follows); else SGSetPlayerPitchFollowsSpeedLegacy(follows); }
-void SGPlayerSetGain(float gain) { if (pipe()) SGPlayerSetGainPipeline(gain); else SGPlayerSetGainLegacy(gain); }
+double SGPlayerSpeed(void) { return onPipeline() ? SGPlayerSpeedPipeline() : SGPlayerSpeedLegacy(); }
+void SGSetPlayerSpeed(double speed) { if (onPipeline()) SGSetPlayerSpeedPipeline(speed); else SGSetPlayerSpeedLegacy(speed); }
+BOOL SGPlayerSpeedAllowed(void) { return onPipeline() ? SGPlayerSpeedAllowedPipeline() : SGPlayerSpeedAllowedLegacy(); }
+float SGPlayerPitch(void) { return onPipeline() ? SGPlayerPitchPipeline() : SGPlayerPitchLegacy(); }
+void SGSetPlayerPitch(float semitones) { if (onPipeline()) SGSetPlayerPitchPipeline(semitones); else SGSetPlayerPitchLegacy(semitones); }
+BOOL SGPlayerPitchAvailable(void) { return onPipeline() ? SGPlayerPitchAvailablePipeline() : SGPlayerPitchAvailableLegacy(); }
+BOOL SGPlayerPitchFollowsSpeed(void) { return onPipeline() ? SGPlayerPitchFollowsSpeedPipeline() : SGPlayerPitchFollowsSpeedLegacy(); }
+void SGSetPlayerPitchFollowsSpeed(BOOL follows) { if (onPipeline()) SGSetPlayerPitchFollowsSpeedPipeline(follows); else SGSetPlayerPitchFollowsSpeedLegacy(follows); }
+void SGPlayerSetGain(float gain) { if (onPipeline()) SGPlayerSetGainPipeline(gain); else SGPlayerSetGainLegacy(gain); }
 
-uint64_t SGPlayerSourceEpoch(void) { return pipe() ? SGPlayerSourceEpochPipeline() : SGPlayerSourceEpochLegacy(); }
-void SGPlayerInvalidateSource(void) { if (pipe()) SGPlayerInvalidateSourcePipeline(); else SGPlayerInvalidateSourceLegacy(); }
-void SGPlayerSetSourceSelector(SGPlayerSourceSelector selector) { if (pipe()) SGPlayerSetSourceSelectorPipeline(selector); else SGPlayerSetSourceSelectorLegacy(selector); }
+uint64_t SGPlayerSourceEpoch(void) { return onPipeline() ? SGPlayerSourceEpochPipeline() : SGPlayerSourceEpochLegacy(); }
+void SGPlayerInvalidateSource(void) { if (onPipeline()) SGPlayerInvalidateSourcePipeline(); else SGPlayerInvalidateSourceLegacy(); }
+void SGPlayerSetSourceSelector(SGPlayerSourceSelector selector) { if (onPipeline()) SGPlayerSetSourceSelectorPipeline(selector); else SGPlayerSetSourceSelectorLegacy(selector); }
