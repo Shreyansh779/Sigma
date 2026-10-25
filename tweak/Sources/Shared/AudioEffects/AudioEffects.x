@@ -30,6 +30,7 @@
 #import <stdatomic.h>
 #import "Core/SGCore.h"
 #import "Shared/Player/SpeedPitch.h"
+#import "Shared/Audio/SGAudioPipeline.h"
 #import "AudioEffects.h"
 #import "AudioEffectsApply.h"
 #import "AudioEffectsPresets.h"
@@ -205,11 +206,9 @@ static void readOut(SGAudioOutputReader reader, AudioUnitRenderActionFlags flags
     }
 }
 
-// `refCon` is the unit; only the music's output is processed and read.
-static OSStatus rendered(void *refCon, AudioUnitRenderActionFlags *flags, const AudioTimeStamp *timestamp, UInt32 bus,
-                         UInt32 frames, AudioBufferList *data) {
-    if (!(*flags & kAudioUnitRenderAction_PostRender) || bus != 0 || !data || !data->mNumberBuffers || !frames) return noErr;
-    if (refCon != SGPlayerMusicOutput()) return noErr;
+// The engine over the finished buffer, then the mono read for the Visualizer. The render thread, on the music's
+// output only — the legacy tap checks that by unit, the pipeline hands only that output here.
+static void processAndRead(AudioUnitRenderActionFlags *flags, UInt32 frames, AudioBufferList *data) {
     if (atomic_load_explicit(&sg_running, memory_order_acquire)) {
         SGDSPEngine *engine = atomic_load_explicit(&sg_engine, memory_order_acquire);
         // A new rate is being set up on the queue: until then the sound passes as it is.
@@ -217,6 +216,23 @@ static OSStatus rendered(void *refCon, AudioUnitRenderActionFlags *flags, const 
     }
     SGAudioOutputReader reader = atomic_load_explicit(&sg_reader, memory_order_acquire);
     if (reader) readOut(reader, *flags, frames, data);
+}
+
+// Legacy tap: `refCon` is the unit; only the music's output is processed and read.
+static OSStatus rendered(void *refCon, AudioUnitRenderActionFlags *flags, const AudioTimeStamp *timestamp, UInt32 bus,
+                         UInt32 frames, AudioBufferList *data) {
+    if (!(*flags & kAudioUnitRenderAction_PostRender) || bus != 0 || !data || !data->mNumberBuffers || !frames) return noErr;
+    if (refCon != SGPlayerMusicOutput()) return noErr;
+    processAndRead(flags, frames, data);
+    return noErr;
+}
+
+// Pipeline tap (SGAudioStageEffects output processor): the pipeline runs this on its music output only, so no
+// unit check is needed. The Visualizer reader runs here too, so it is fed under the pipeline exactly as before.
+static OSStatus outputEffects(void *refCon, AudioUnitRenderActionFlags *flags, const AudioTimeStamp *timestamp, UInt32 bus,
+                              UInt32 frames, AudioBufferList *data) {
+    if (!(*flags & kAudioUnitRenderAction_PostRender) || bus != 0 || !data || !data->mNumberBuffers || !frames) return noErr;
+    processAndRead(flags, frames, data);
     return noErr;
 }
 
@@ -607,10 +623,20 @@ void SGDSPCompanderResponse(NSArray<NSNumber *> *gains, NSInteger count, double 
     SGDSPEngineCompanderCurve(SGDSPCompanderFrequencies, bands, (int)count, frequencies, values);
 }
 
-// The output audio goes to now, for the corrections remembered per output (AutoEq.m).
+// The output audio goes to now, for the corrections remembered per output (AutoEq.m). An audio-session route
+// observer, independent of the tap, so AutoEq follows the output under either backend.
 static void followRoute(void) {
     AVAudioSessionPortDescription *port = AVAudioSession.sharedInstance.currentRoute.outputs.firstObject;
     if (port) SGAutoEqOutputChanged(port.UID, port.portName);
+}
+
+// Pipeline tap (SGAudioStageEffects prepare): at every output start or format change the pipeline calls this
+// with the music output; the engine reads the new format and starts its stream over. The pipeline owns the
+// render notify, so unlike listenTo there is none to add here.
+static void prepareEffects(AudioUnit unit) {
+    if (!unit || !readFormat(unit)) return;
+    SGDSPEngine *engine = atomic_load(&sg_engine);
+    if (engine) SGDSPEngineRestart(engine);
 }
 
 %ctor {
@@ -622,7 +648,14 @@ static void followRoute(void) {
     dispatch_async(dispatch_get_main_queue(), ^{
         followRoute();
     });
-    sg_reachable = SGPlayerWatchMusicOutput(listenTo);
+    if (SGAudioPipelineEnabled()) {
+        // The unified pipeline owns Spotify's output; the effects register as its output-domain stage.
+        static const SGAudioProcessor processor = {prepareEffects, outputEffects};
+        sg_reachable = SGAudioPipelineRegister(SGAudioStageEffects, &processor);
+    } else {
+        // The legacy tap: watch for the music's output and add our own render notify to it.
+        sg_reachable = SGPlayerWatchMusicOutput(listenTo);
+    }
     if (!sg_reachable) {
         SGLog(@"dsp: Spotify's output cannot be reached, the effects cannot reach its sound");
         return;

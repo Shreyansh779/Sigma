@@ -340,11 +340,6 @@ static void apply(void) {
 
 #pragma mark - the menu's calls (…Pipeline backends)
 
-double SGPlayerAudioLatency(void) {
-    SGTimePitch *unit = atomic_load(&sg_pull);
-    return atomic_load(&sg_engaged) && unit ? SGTimePitchLatency(unit) : 0;
-}
-
 double SGPlayerSpeedPipeline(void) {
     return sg_speed;
 }
