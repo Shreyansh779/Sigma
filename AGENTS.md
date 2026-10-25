@@ -65,10 +65,12 @@ Rules:
   `vX.Y.Z-beta.N` pre-releases the same way (`release-please-config.beta.json`); only beta builds are
   offered them. When `beta` merges into `main`, keep `main`'s `version.txt`.
 - Moving to a new Spotify version: `SGSupportedSpotifyVersion` in `Settings/SGPageStyle.m` is the one the
-  mod is made for (9.1.78); `SGSupportedSpotifyVersions()` adds what it is checked on (9.1.88) and
-  `SGLikelyWorksSpotifyVersions()` what ran cleanly in a short test (9.1.90). A version in none of them gets
-  the "isn't supported" alert and red row (`App/About/Compatibility.m`), so a bump without it warns
-  everyone. Update the README (badge and text), `.github/ISSUE_TEMPLATE/bug_report.yml`,
+  mod is recommended on and built against (9.1.90); `SGSupportedSpotifyVersions()` adds the older versions it
+  still supports (9.1.88, 9.1.78) and `SGLikelyWorksSpotifyVersions()` holds any that only ran cleanly in a
+  short test (currently none). A version in none of them gets the "isn't supported" alert and red row
+  (`App/About/Compatibility.m`), so a bump without it warns everyone. Note the tree was not swept against a
+  9.1.90 class dump: hooks are inherited from Vitrine (checked on 9.1.90) and run there, but the recommendation
+  is on that basis, not a full sweep. Update the README (badge and text), `.github/ISSUE_TEMPLATE/bug_report.yml`,
   the iOS floor above and the web's `content/site.ts` with it. Most hooks on 9.1.88 and 9.1.90 come from
   Vitrine, which was checked on them, but none of this tree was swept against a class dump of those two
   yet. `Redesigned/Player/PlayerMorph.x` is Sigma's look on 9.1.78's `SPTBarOverlayPresentationTransition` and,
