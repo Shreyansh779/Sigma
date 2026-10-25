@@ -8,8 +8,8 @@
 
 <p align="center">
   <img src="https://img.shields.io/badge/iOS-000000?style=for-the-badge&logo=ios&logoColor=white" alt="iOS">
-  <img src="https://img.shields.io/badge/Spotify-9.1.78-1ED760?style=for-the-badge&logo=spotify&logoColor=white" alt="Spotify 9.1.78">
-  <img src="https://img.shields.io/badge/9.1.88-supported-555555?style=for-the-badge&logo=spotify&logoColor=white" alt="Spotify 9.1.88 supported">
+  <img src="https://img.shields.io/badge/Spotify-9.1.90-1ED760?style=for-the-badge&logo=spotify&logoColor=white" alt="Spotify 9.1.90">
+  <img src="https://img.shields.io/badge/9.1.88%20%7C%209.1.78-supported-555555?style=for-the-badge&logo=spotify&logoColor=white" alt="Spotify 9.1.88 and 9.1.78 supported">
   <img src="https://img.shields.io/badge/Objective--C-3A95E3?style=for-the-badge&logo=apple&logoColor=white" alt="Objective-C">
   <img src="https://img.shields.io/badge/GitHub_Actions-2671E5?style=for-the-badge&logo=githubactions&logoColor=white" alt="GitHub Actions">
   <img src="https://img.shields.io/badge/License-GPL_v3-blue?style=for-the-badge" alt="GPL-3.0">
@@ -31,9 +31,8 @@
 A no-jailbreak Theos tweak that rebuilds Spotify for iOS in Liquid Glass, injected into your own
 decrypted IPA and signed with your own certificate.
 
-Built and tested on **Spotify 9.1.78**, and checked on **9.1.88**. **9.1.90** likely works: it has not been
-checked beyond a short run. The mod hooks Spotify's own classes, which change between releases, so any other
-version may build and then break.
+Recommended on **Spotify 9.1.90**; also runs on **9.1.88** and **9.1.78**. The mod hooks Spotify's own
+classes, which change between releases, so any other version may build and then break.
 
 | | |
 |---|---|
@@ -46,7 +45,7 @@ all. Both looks live in Settings → Mod Settings.
 
 ## Build it
 
-No IPA is distributed. Bring a decrypted **Spotify 9.1.78** IPA (or 9.1.88, or 9.1.90 at your own risk); you get an unsigned
+No IPA is distributed. Bring a decrypted **Spotify 9.1.90** IPA (or 9.1.88, or 9.1.78); you get an unsigned
 `Sigma-<mod version>.ipa` to sign with SideStore, Feather or any certificate signer. Each
 release also carries the tweak's `.deb`.
 

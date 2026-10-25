@@ -290,12 +290,12 @@ void SGOpenURL(NSString *url) {
 }
 
 NSString *const SGDiscordURL = @"https://discord.gg/9e4GR8TKMj";
-NSString *const SGSupportedSpotifyVersion = @"9.1.78";
+NSString *const SGSupportedSpotifyVersion = @"9.1.90";
 
 NSArray<NSString *> *SGSupportedSpotifyVersions(void) {
-    return @[SGSupportedSpotifyVersion, @"9.1.88"];
+    return @[SGSupportedSpotifyVersion, @"9.1.88", @"9.1.78"];
 }
 
 NSArray<NSString *> *SGLikelyWorksSpotifyVersions(void) {
-    return @[@"9.1.90"];
+    return @[];
 }
