@@ -70,6 +70,8 @@
 #import "Shared/Lyrics/Lyrics.h"
 #import "Shared/Player/PlayerState.h"
 #import "Shared/Player/SpeedPitch.h"
+#import "Shared/Player/PipelineSource.h"
+#import "Shared/Audio/SGAudioPipeline.h"
 #import "Sing.h"
 #import "SGSingEngine.h"
 #import "SGSingLoader.h"
@@ -173,14 +175,53 @@ static OSStatus stage(UInt32 frames, AudioBufferList *data, SGPlayerPull pull, v
     return SGSingEngineRender(engine, frames, data->mBuffers[0].mData, data->mBuffers[1].mData, pullChain, &chain);
 }
 
+// The unified-pipeline backend of `stage`: Karaoke's render in the pipeline's source slot
+// (Shared/Player/PipelineSource), above the lossless swap. `pull` is the lossless-applied source pull, so a file
+// still swaps in under Karaoke, matching the legacy stage pulling through the source selector. Returns false to
+// leave the buffer to the lossless path when there is no engine or the format is not one Sing takes.
+typedef struct {
+    SGPipelineSourcePull pull;
+    void *context;
+} PipeChain;
+
+static OSStatus pullForSing(void *context, UInt32 frames, float *left, float *right, UInt32 *sounding) {
+    PipeChain *chain = context;
+    struct { AudioBufferList list; AudioBuffer second; } buffers = {{2, {{1, frames * 4, left}}}, {1, frames * 4, right}};
+    return chain->pull(chain->context, frames, &buffers.list, sounding);
+}
+
+static bool singRender(UInt32 frames, AudioBufferList *data, SGPipelineSourcePull pull, void *pullContext, OSStatus *status) {
+    SGSingEngine *engine = atomic_load_explicit(&sg_engine, memory_order_acquire);
+    #if SG_DRIVER
+    atomic_store(&sg_anchorStageActive, false);
+    #endif
+    if (!engine) return false;
+    atomic_store_explicit(&sg_staged, true, memory_order_relaxed);
+    atomic_store_explicit(&sg_rendered, true, memory_order_relaxed);
+    BOOL takes = atomic_load_explicit(&sg_formatTaken, memory_order_relaxed) && data->mNumberBuffers == 2;
+    for (UInt32 b = 0; takes && b < 2; b++) {
+        takes = data->mBuffers[b].mData && data->mBuffers[b].mNumberChannels == 1 && data->mBuffers[b].mDataByteSize == frames * sizeof(float);
+    }
+    if (!takes) {
+        atomic_store_explicit(&sg_formatRefused, true, memory_order_relaxed);
+        return false;
+    }
+    #if SG_DRIVER
+    atomic_store(&sg_anchorStageActive, true);
+    #endif
+    PipeChain chain = {pull, pullContext};
+    *status = SGSingEngineRender(engine, frames, data->mBuffers[0].mData, data->mBuffers[1].mData, pullForSing, &chain);
+    return true;
+}
+
 #pragma mark - Spotify's audio thread
 
-// Under Shared/Player's lock, one call at a time: the last output and format seen are this function's own.
-static void musicOutputChanged(AudioUnit output) {
+// The music's output format: whether Sing takes it (44.1 kHz, float, a buffer per channel, two channels), and
+// the engine flushed when it changed so the sound held ahead for the old one is dropped. Shared by the legacy
+// output watcher and the pipeline's prepare hook.
+static void applyFormat(AudioUnit output, BOOL known, AudioStreamBasicDescription format) {
     static AudioUnit last;
     static AudioStreamBasicDescription lastFormat;
-    AudioStreamBasicDescription format = {0};
-    BOOL known = output && SGPlayerMusicClientFormat(&format);
     atomic_store_explicit(&sg_outputStarted, output != NULL, memory_order_relaxed);
     BOOL takes = known && format.mFormatID == kAudioFormatLinearPCM && format.mSampleRate == kSGSingRate
                  && format.mChannelsPerFrame == 2 && format.mBitsPerChannel == 32 && (format.mFormatFlags & kAudioFormatFlagIsFloat)
@@ -196,6 +237,24 @@ static void musicOutputChanged(AudioUnit output) {
               (unsigned)format.mChannelsPerFrame, (unsigned)format.mBitsPerChannel, (unsigned)format.mFormatFlags,
               takes ? @"Sing takes it" : output ? @"not a format Sing takes, its sound passes as it is" : @"no music output now");
     }
+}
+
+// Legacy watcher: under Shared/Player's lock, one call at a time. The format is the output's client side.
+static void musicOutputChanged(AudioUnit output) {
+    AudioStreamBasicDescription format = {0};
+    BOOL known = output && SGPlayerMusicClientFormat(&format);
+    applyFormat(output, known, format);
+}
+
+// Pipeline prepare (SGAudioStageSing): called off-render at every output start or format change with the output
+// unit; the format comes from the pipeline's source (the mixer), which is the same sound Spotify hands the output.
+static void prepareSing(AudioUnit output) {
+    AudioStreamBasicDescription format = {0};
+    BOOL known = output && SGAudioPipelineSourceFormat(&format);
+    applyFormat(output, known, format);
+    // The pipeline drops its source processor on every start and format change; put ours (Karaoke above the
+    // lossless swap) back now that the source is wired.
+    SGPipelineSourceEnsureInstalled();
 }
 
 #pragma mark - the model
@@ -1257,10 +1316,20 @@ static void readHeat(void) {
 %ctor {
     // Karaoke's switch was the redesign's own, spotifyglass.redesign.sing, before it worked under both looks.
     SGMigrateKey(@"spotifyglass.redesign.sing", SGKeySing);
-    sg_outputReachable = SGPlayerWatchMusicOutput(musicOutputChanged);
+    if (SGAudioPipelineEnabled()) {
+        // Under the pipeline: Karaoke renders in the source slot (above the lossless swap), and learns the output
+        // format from a prepare-only Sing stage (its output processor is NULL; only prepare runs). The lead goes
+        // to Sing's own position hooks below, not the speed own-clock, which the pipeline does not have — so
+        // SGPlayerSetLeadReaders is skipped (it would only reach the dormant legacy hub).
+        static const SGAudioProcessor processor = {prepareSing, NULL};
+        sg_outputReachable = SGAudioPipelineRegister(SGAudioStageSing, &processor);
+        SGPipelineSetSingRenderer(singRender);
+    } else {
+        sg_outputReachable = SGPlayerWatchMusicOutput(musicOutputChanged);
+        SGPlayerSetStage(stage);
+        SGPlayerSetLeadReaders(SGSingHeldLead, SGSingLeadOf);
+    }
     if (!sg_outputReachable) SGLog(@"sing: Spotify's output cannot be watched, Sing cannot read its format");
-    SGPlayerSetStage(stage);
-    SGPlayerSetLeadReaders(SGSingHeldLead, SGSingLeadOf);
     sg_frontSeconds = SGSingSpatialFront();
     %init;
     SGRequireClasses(@[@"SPTPlayerState", @"SPTEsperantoPlayer"]);

@@ -11,6 +11,7 @@
 #import "Native/Player/NowPlaying.h"
 #import "Shared/Haptics/Haptics.h"
 #import "Shared/Lossless/SGLossless.h"
+#import "Shared/Audio/SGAudioPipeline.h"
 #import "Redesigned/Lyrics/LyricsText.h"
 #import "Redesigned/Navbar/Navbar.h"
 #import "Redesigned/NowPlayingBar/NowPlayingBar.h"
@@ -130,6 +131,15 @@ UIViewController *SGPlayerSettingsPage(void) {
        @"and its sound matches what Spotify plays, from about 4 s after the song starts or you seek. Spotify still "
        @"streams its own copy, at its lowest quality while the next song has a file. Karaoke and speeds other than "
        @"1x keep Spotify's sound. Applies after you restart Spotify.")];
+
+    // Experimental: routes every audio feature through one shared tap instead of each tapping the render
+    // path on its own. Off by default; off, each feature works exactly as before. Turn it off again if any
+    // audio misbehaves. Tested on Spotify 9.1.78 only. (Shared/Audio/SGAudioPipeline.)
+    [sections addObject:SGNotedSection(@"Audio engine", @[
+        SGOptionRow(@"Unified audio pipeline", @"One shared tap for effects, speed, pitch, lossless and haptics", SGKeyAudioPipeline),
+    ], @"Experimental. Off, every audio feature works as it does today. On, they share one audio tap. Turn it "
+       @"off if effects, speed, pitch, lossless or music haptics stop working, or if playback glitches. Applies "
+       @"after you restart Spotify.")];
 
     // The redesign's page leads with a card of its player and the background's control, the background's
     // rows and the Mini player section under it.
