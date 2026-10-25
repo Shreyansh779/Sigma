@@ -64,8 +64,8 @@ static NSArray<SGKaraokeLine *> *linesFromLRC(NSString *lrc) {
     return SGKaraokeEstimatedLines(starts, texts);
 }
 
-SGLyricsResult *SGLyricsLRCResult(NSString *lrc) {
-    NSArray<SGKaraokeLine *> *lines = [lrc isKindOfClass:NSString.class] ? linesFromLRC(lrc) : nil;
+// Timed lines as a synced result, the text for Spotify's own page taken off them; nil for no lines.
+static SGLyricsResult *resultFromLines(NSArray<SGKaraokeLine *> *lines) {
     if (!lines) return nil;
     SGLyricsResult *result = [SGLyricsResult new];
     result.synced = YES;
@@ -78,11 +78,23 @@ SGLyricsResult *SGLyricsLRCResult(NSString *lrc) {
     return result;
 }
 
+SGLyricsResult *SGLyricsLRCResult(NSString *lrc) {
+    return resultFromLines([lrc isKindOfClass:NSString.class] ? linesFromLRC(lrc) : nil);
+}
+
 static SGLyricsResult *resultFrom(NSDictionary *record) {
     if (![record isKindOfClass:NSDictionary.class]) return nil;
     SGLyricsResult *result = [SGLyricsResult new];
     result.instrumental = [record[@"instrumental"] boolValue];
     if (result.instrumental) return result;
+    // A record someone has timed by the word carries a Lyricsfile (Lyricsfile.m); its word timing beats
+    // the LRC's line timing, so it is read first. One with no word timed line reads as nil and falls through.
+    id wordYAML = record[@"lyricsfile"];
+    SGLyricsResult *worded = resultFromLines([wordYAML isKindOfClass:NSString.class] ? SGLyricsfileLines(wordYAML) : nil);
+    if (worded) {
+        worded.wordTimed = YES;
+        return worded;
+    }
     id synced = record[@"syncedLyrics"], plain = record[@"plainLyrics"];
     SGLyricsResult *timed = SGLyricsLRCResult(synced);
     if (timed) return timed;
@@ -147,7 +159,7 @@ SGLyricsAsk SGLrcLibAsk = ^(SGLyricsQuery *query, void (^done)(SGLyricsResult *r
             SGLyricsResult *result = resultFrom(record);
             SGLog(@"lrclib: search for %@ by %@ gave %@", query.title, query.artist,
                   !result ? @"nothing" : result.instrumental ? @"an instrumental"
-                  : result.synced ? [NSString stringWithFormat:@"%lu timed lines", (unsigned long)result.karaokeLines.count]
+                  : result.synced ? [NSString stringWithFormat:@"%lu %@ lines", (unsigned long)result.karaokeLines.count, result.wordTimed ? @"word timed" : @"timed"]
                   : [NSString stringWithFormat:@"%lu untimed lines", (unsigned long)result.texts.count]);
             done(result);
         });
@@ -167,7 +179,7 @@ SGLyricsAsk SGLrcLibAsk = ^(SGLyricsQuery *query, void (^done)(SGLyricsResult *r
             return;
         }
         SGLog(@"lrclib: %@ by %@ matched exactly, %@", query.title, query.artist,
-              result.instrumental ? @"instrumental" : result.synced ? @"timed" : @"untimed");
+              result.instrumental ? @"instrumental" : result.wordTimed ? @"word timed" : result.synced ? @"timed" : @"untimed");
         done(result);
     });
 };
