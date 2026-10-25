@@ -55,7 +55,7 @@ static OSStatus losslessPull(void *context, UInt32 frames, AudioBufferList *data
 }
 
 // The pipeline's single source processor: Karaoke first (if it takes the buffer), else the lossless path.
-static OSStatus source(void *context, UInt32 frames, AudioBufferList *data, const AudioTimeStamp *time) {
+static OSStatus sourceSlot(void *context, UInt32 frames, AudioBufferList *data, const AudioTimeStamp *time) {
     SGPipelineSingRenderer sing = atomic_load(&sg_sing);
     OSStatus status = noErr;
     if (sing && sing(frames, data, losslessPull, (void *)time, &status)) return status;
@@ -72,7 +72,7 @@ static void refreshRate(void) {
 // output start or format change, so Sing's prepare hook calls this again each time the output is prepared.
 void SGPipelineSourceEnsureInstalled(void) {
     refreshRate();
-    SGAudioPipelineSetSourceProcessor(source, NULL);
+    SGAudioPipelineSetSourceProcessor(sourceSlot, NULL);
 }
 
 void SGPlayerSetSourceSelectorPipeline(SGPlayerSourceSelector selector) {
