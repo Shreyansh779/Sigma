@@ -69,7 +69,9 @@
 #import "Headers/SPTPlayer.h"
 #import "PlayerState.h"
 #import "SpeedPitch.h"
+#import "SpeedPitchImpl.h"
 #import "SGTimePitch.h"
+#import "Shared/Audio/SGAudioPipeline.h"
 #import "Shared/Lossless/SGAnchor.h"
 
 // The unit stays in this long after speed and pitch both came back to normal.
@@ -132,9 +134,9 @@ static _Atomic(SGPlayerStage) sg_stage;
 static _Atomic(SGPlayerSourceSelector) sg_sourceSelector;
 static atomic_uint_fast64_t sg_sourceEpoch = 1;
 
-uint64_t SGPlayerSourceEpoch(void) { return atomic_load(&sg_sourceEpoch); }
-void SGPlayerInvalidateSource(void) { atomic_fetch_add(&sg_sourceEpoch, 1); }
-void SGPlayerSetSourceSelector(SGPlayerSourceSelector selector) {
+uint64_t SGPlayerSourceEpochLegacy(void) { return atomic_load(&sg_sourceEpoch); }
+void SGPlayerInvalidateSourceLegacy(void) { atomic_fetch_add(&sg_sourceEpoch, 1); }
+void SGPlayerSetSourceSelectorLegacy(SGPlayerSourceSelector selector) {
     SGPlayerInvalidateSource();
     atomic_store(&sg_sourceSelector, selector);
 }
@@ -962,11 +964,11 @@ static void applyToFormat(void) {
 
 #pragma mark - the calls
 
-double SGPlayerSpeed(void) {
+double SGPlayerSpeedLegacy(void) {
     return sg_speed;
 }
 
-BOOL SGPlayerSpeedAllowed(void) {
+BOOL SGPlayerSpeedAllowedLegacy(void) {
     return tapped();
 }
 
@@ -1031,7 +1033,7 @@ static void handBack(void) {
     os_unfair_lock_unlock(&sg_clockLock);
 }
 
-void SGSetPlayerSpeed(double speed) {
+void SGSetPlayerSpeedLegacy(double speed) {
     if (!tapped()) return;
     // Spotify's clock is right until the speed leaves 1x, so it is read before, as Spotify counts it: Sing's
     // -position, outside this file's, takes its lead off what this one returns.
@@ -1051,32 +1053,32 @@ void SGSetPlayerSpeed(double speed) {
     apply();
 }
 
-float SGPlayerPitch(void) {
+float SGPlayerPitchLegacy(void) {
     return sg_semitones;
 }
 
-void SGSetPlayerPitch(float semitones) {
+void SGSetPlayerPitchLegacy(float semitones) {
     if (!sg_reachable && !tapped()) return;
     sg_semitones = semitones;
     apply();
 }
 
-BOOL SGPlayerPitchFollowsSpeed(void) {
+BOOL SGPlayerPitchFollowsSpeedLegacy(void) {
     return SGEnabled(SGKeyPitchFollowsSpeed);
 }
 
-void SGSetPlayerPitchFollowsSpeed(BOOL follows) {
+void SGSetPlayerPitchFollowsSpeedLegacy(BOOL follows) {
     SGSetEnabled(SGKeyPitchFollowsSpeed, follows);
     SGTimePitch *unit = atomic_load(&sg_pull);
     if (unit) SGTimePitchSetFollows(unit, follows);
     apply();
 }
 
-BOOL SGPlayerPitchAvailable(void) {
+BOOL SGPlayerPitchAvailableLegacy(void) {
     return sg_reachable || tapped();
 }
 
-void SGPlayerSetGain(float gain) {
+void SGPlayerSetGainLegacy(float gain) {
     if (!sg_reachable) {
         static int logged;
         if (logged++ < 1) SGLog(@"audio: Spotify's output was not reached, the gain cannot apply");
@@ -1099,6 +1101,9 @@ BOOL SGPlayerMusicClientFormat(AudioStreamBasicDescription *format) {
 }
 
 static void rebind(void) {
+    // The unified pipeline (Shared/Audio/SGAudioPipeline) rebinds the audio imports itself when the master
+    // switch is on. This legacy hub must not also rebind them, or the two would chain on the same slots.
+    if (SGAudioPipelineEnabled()) return;
     static dispatch_once_t once;
     dispatch_once(&once, ^{
         mach_timebase_info_data_t timebase;
@@ -1203,6 +1208,9 @@ BOOL SGPlayerWatchMusicOutput(SGPlayerOutputWatcher watcher) {
 
 %ctor {
     SGMigrateKey(@"spotifyglass.speedPitch.follows", SGKeyPitchFollowsSpeed);
+    // The unified pipeline owns the audio path when the master switch is on; this legacy hub stays dormant and
+    // its %hooks never init, so only one side ever drives Spotify's output.
+    if (SGAudioPipelineEnabled()) return;
     storeFloat(&sg_speedBits, 1);
     storeFloat(&sg_gainBits, 1);
     rebind();
