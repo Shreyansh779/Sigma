@@ -4,12 +4,6 @@
 #import <Foundation/Foundation.h>
 #include <stdbool.h>
 
-// Master switch (Mod Settings → Player → Audio engine), off until turned on, read once at launch. While
-// it is off SGAudioPipelineRegister refuses and the whole pipeline stays inert — no imports are rebound —
-// so every audio feature keeps its own render tap exactly as it was. A change needs a restart.
-#define SGKeyAudioPipeline @"spotifyglass.audioPipeline"
-bool SGAudioPipelineEnabled(void);
-
 typedef enum {
     SGAudioStageSing,
     SGAudioStageSpeedPitch,
