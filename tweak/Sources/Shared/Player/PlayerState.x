@@ -24,6 +24,12 @@ SPTPlayerState *SGPlayerState(void) {
     return sg_playerState;
 }
 
+static __weak id sg_player;
+
+id SGPlayer(void) {
+    return sg_player;
+}
+
 // What an observer is told about; the state object itself is new with every position report.
 static NSString *keyOf(SPTPlayerState *state) {
     SPTPlayerOptions *options = [state respondsToSelector:@selector(options)] ? state.options : nil;
@@ -84,6 +90,7 @@ static SGPlayerObserver *sg_ownObserver;
     id player = self;
     static dispatch_once_t once;
     dispatch_once(&once, ^{
+        sg_player = player;
         dispatch_async(dispatch_get_main_queue(), ^{
             sg_ownObserver = [SGPlayerObserver new];
             [(id<SPTPlayer>)player addPlayerObserver:sg_ownObserver];

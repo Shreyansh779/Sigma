@@ -25,3 +25,6 @@ NSString *SGURIString(id uri);
 void SGAddPlayerStateObserver(id<SGPlayerStateObserver> observer);
 // The last state reported, nil before the player has reported one.
 SPTPlayerState *SGPlayerState(void);
+// Spotify's player object (the first SPTEsperantoPlayer the app watches), nil before it is seen: for the
+// features that ask it to do something, not just read its state (Shared/AlbumQueue bulk-queues through it).
+id SGPlayer(void);
