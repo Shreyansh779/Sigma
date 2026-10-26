@@ -12,6 +12,24 @@ BOOL SGDebugLog(void) {
     return on;
 }
 
+// Documents/Sigma/log.txt, the one file the write and read paths share; creates the folder.
+static NSString *logFilePath(void) {
+    NSString *documents = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES).firstObject;
+    NSString *folder = [documents stringByAppendingPathComponent:@"Sigma"];
+    [NSFileManager.defaultManager createDirectoryAtPath:folder withIntermediateDirectories:YES attributes:nil error:nil];
+    return [folder stringByAppendingPathComponent:@"log.txt"];
+}
+
+NSString *SGLogContents(void) {
+    NSString *path = logFilePath();
+    NSError *error = nil;
+    NSString *contents = [NSString stringWithContentsOfFile:path encoding:NSUTF8StringEncoding error:&error];
+    if (!contents && error && error.code != NSFileReadNoSuchFileError)
+        return [NSString stringWithFormat:@"Could not read the diagnostics log: %@", error.localizedDescription];
+    if (!contents.length) return @"No diagnostics have been recorded yet. Turn on Debug log, then restart Spotify.";
+    return contents;
+}
+
 void SGLogToFile(NSString *line) {
     if (!SGDebugLog()) return;
     static dispatch_queue_t queue;
@@ -19,13 +37,10 @@ void SGLogToFile(NSString *line) {
     static dispatch_once_t once;
     dispatch_once(&once, ^{
         queue = dispatch_queue_create("sigma.log", DISPATCH_QUEUE_SERIAL);
-        NSString *documents = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES).firstObject;
-        NSString *folder = [documents stringByAppendingPathComponent:@"Sigma"];
-        [NSFileManager.defaultManager createDirectoryAtPath:folder withIntermediateDirectories:YES attributes:nil error:nil];
-        path = [folder stringByAppendingPathComponent:@"log.txt"];
+        path = logFilePath();
         NSDictionary *attributes = [NSFileManager.defaultManager attributesOfItemAtPath:path error:nil];
         if (attributes.fileSize > kLogLimit) {
-            NSString *old = [folder stringByAppendingPathComponent:@"log.old.txt"];
+            NSString *old = [path.stringByDeletingLastPathComponent stringByAppendingPathComponent:@"log.old.txt"];
             [NSFileManager.defaultManager removeItemAtPath:old error:nil];
             [NSFileManager.defaultManager moveItemAtPath:path toPath:old error:nil];
         }
