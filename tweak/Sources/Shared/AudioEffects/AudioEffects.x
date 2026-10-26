@@ -218,17 +218,8 @@ static void processAndRead(AudioUnitRenderActionFlags *flags, UInt32 frames, Aud
     if (reader) readOut(reader, *flags, frames, data);
 }
 
-// Legacy tap: `refCon` is the unit; only the music's output is processed and read.
-static OSStatus rendered(void *refCon, AudioUnitRenderActionFlags *flags, const AudioTimeStamp *timestamp, UInt32 bus,
-                         UInt32 frames, AudioBufferList *data) {
-    if (!(*flags & kAudioUnitRenderAction_PostRender) || bus != 0 || !data || !data->mNumberBuffers || !frames) return noErr;
-    if (refCon != SGPlayerMusicOutput()) return noErr;
-    processAndRead(flags, frames, data);
-    return noErr;
-}
-
-// Pipeline tap (SGAudioStageEffects output processor): the pipeline runs this on its music output only, so no
-// unit check is needed. The Visualizer reader runs here too, so it is fed under the pipeline exactly as before.
+// The pipeline runs this (SGAudioStageEffects output processor) on its music output only. The Visualizer reader
+// runs here too, so it is fed from the same finished buffer as the effects.
 static OSStatus outputEffects(void *refCon, AudioUnitRenderActionFlags *flags, const AudioTimeStamp *timestamp, UInt32 bus,
                               UInt32 frames, AudioBufferList *data) {
     if (!(*flags & kAudioUnitRenderAction_PostRender) || bus != 0 || !data || !data->mNumberBuffers || !frames) return noErr;
@@ -287,19 +278,6 @@ static BOOL readFormat(AudioUnit unit) {
         SGDSPApply(SGKeyDSP);
     });
     return YES;
-}
-
-// The music's output started, changed or changed format (Shared/Player): its format read, the notify on it.
-static void listenTo(AudioUnit unit) {
-    if (!unit) return;
-    AudioUnitRemoveRenderNotify(unit, rendered, unit);
-    if (!readFormat(unit)) return;
-    // The sound held from before the output stopped, or from another output, would play first; the stream
-    // starts over instead.
-    SGDSPEngine *engine = atomic_load(&sg_engine);
-    if (engine) SGDSPEngineRestart(engine);
-    OSStatus status = AudioUnitAddRenderNotify(unit, rendered, unit);
-    if (status != noErr) SGLog(@"dsp: the render notify could not be added (%d)", (int)status);
 }
 
 #pragma mark - errors
@@ -648,14 +626,9 @@ static void prepareEffects(AudioUnit unit) {
     dispatch_async(dispatch_get_main_queue(), ^{
         followRoute();
     });
-    if (SGAudioPipelineEnabled()) {
-        // The unified pipeline owns Spotify's output; the effects register as its output-domain stage.
-        static const SGAudioProcessor processor = {prepareEffects, outputEffects};
-        sg_reachable = SGAudioPipelineRegister(SGAudioStageEffects, &processor);
-    } else {
-        // The legacy tap: watch for the music's output and add our own render notify to it.
-        sg_reachable = SGPlayerWatchMusicOutput(listenTo);
-    }
+    // The unified pipeline owns Spotify's output; the effects register as its output-domain stage.
+    static const SGAudioProcessor processor = {prepareEffects, outputEffects};
+    sg_reachable = SGAudioPipelineRegister(SGAudioStageEffects, &processor);
     if (!sg_reachable) {
         SGLog(@"dsp: Spotify's output cannot be reached, the effects cannot reach its sound");
         return;

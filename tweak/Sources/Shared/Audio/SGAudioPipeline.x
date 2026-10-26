@@ -2,7 +2,6 @@
 #import "Shared/Audio/SGAudioSourceQueue.h"
 #import "Core/SGLog.h"
 #import "Core/SGRebind.h"
-#import "Core/SGPrefs.h"
 #import <pthread.h>
 #import <stdatomic.h>
 #import <unistd.h>
@@ -382,15 +381,7 @@ static void install(void) {
         }
     });
 }
-bool SGAudioPipelineEnabled(void) {
-    // Read once at launch, like the mod's other switches. Off (unset), the pipeline never installs.
-    static bool enabled;
-    static dispatch_once_t once;
-    dispatch_once(&once, ^{ enabled = SGHidden(SGKeyAudioPipeline); });
-    return enabled;
-}
 bool SGAudioPipelineRegister(SGAudioStage stage, const SGAudioProcessor *processor) {
-    if (!SGAudioPipelineEnabled()) return false; // master switch off: the pipeline stays inert
     if (stage >= SGAudioStageCount || stage < 0 || !processor) return false;
     atomic_store(&processors[stage], processor);
     install();
