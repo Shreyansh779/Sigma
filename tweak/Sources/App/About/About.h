@@ -22,6 +22,9 @@ SGModRow *SGAppIconRow(void);
 
 UIViewController *SGAboutPage(void);   // the Mod page
 
+// DeviceLogs.m: the recent device log (Documents/Sigma/log.txt) with Copy, Share and Refresh.
+UIViewController *SGDeviceLogsPage(void);
+
 // ChangeNotes.m: a Release Please changelog section as one line per change.
 @interface SGUpdateChange : NSObject
 @property (nonatomic, copy) NSString *kind;   // "Features", "Fixes", ... as the release names it

@@ -54,6 +54,7 @@ UIViewController *SGAboutPage(void) {
         SGSection(nil, whatsNewRows()),
         SGSection(@"For finding faults", @[
             SGHideRow(@"Debug log", @"Writes what the mod does, with touches and stalls, to Documents/Sigma/log.txt. Restart to apply", SGKeyDebugLog),
+            withSymbol(SGPageRow(@"Device logs", ^UIViewController *{ return SGDeviceLogsPage(); }), @"doc.text.magnifyingglass"),
         ]),
         SGSection(nil, @[reset]),
     ]];
