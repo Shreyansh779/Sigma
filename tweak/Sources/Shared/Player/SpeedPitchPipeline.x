@@ -1,13 +1,11 @@
-// Speed and pitch, the unified-pipeline backend (master switch on). Where the legacy hub (SpeedPitch.x) owns
-// Spotify's outputs and rebinds the audio imports itself, this one hands that role to Shared/Audio/SGAudioPipeline
-// and is a client of it: it registers one source-domain pull processor (the time/pitch unit, which pulls the
-// mixer faster or slower) and one output-domain processor (the in-place pitch fallback and the sleep-timer gain).
-// The pipeline runs the music output; this file only shapes its sound.
+// Speed and pitch, a client of the unified audio engine (Shared/Audio/SGAudioPipeline), which owns Spotify's
+// outputs and rebinds the audio imports. This file registers one source-domain pull processor (the time/pitch
+// unit, which pulls the mixer faster or slower) and one output-domain processor (the in-place pitch fallback and
+// the sleep-timer gain). The pipeline runs the music output; this file only shapes its sound, and defines the
+// public SGPlayer* speed/pitch/gain names.
 //
-// It drives Spotify's own SGTimePitch (Shared/Player/SGTimePitch), the same unit the legacy hub uses, so pitch
-// follows speed through SGTimePitchSetFollows and a reset at SGTimePitchSwitchPending, exactly as it does today.
-// Only the tap differs. The public SGPlayer* speed/pitch/gain names are the …Pipeline backends SpeedPitchHub.m
-// dispatches to when the switch is on; SpeedPitch.x keeps the …Legacy ones.
+// It drives Spotify's own SGTimePitch (Shared/Player/SGTimePitch): pitch follows speed through
+// SGTimePitchSetFollows and a reset at SGTimePitchSwitchPending.
 //
 // Threading: SGTimePitchRender/Process and the output processor run on the render thread and touch only atomics
 // and their own units; everything else is main thread. prepareOutput and the format reads run off-render, before
@@ -19,7 +17,6 @@
 #import "Shared/Audio/SGAudioPipeline.h"
 #import "Headers/SPTPlayer.h"
 #import "SpeedPitch.h"
-#import "SpeedPitchImpl.h"
 #import "SGTimePitch.h"
 
 // The unit stays in this long after speed and pitch both came back to normal.
@@ -340,44 +337,44 @@ static void apply(void) {
 
 #pragma mark - the menu's calls (…Pipeline backends)
 
-double SGPlayerSpeedPipeline(void) {
+double SGPlayerSpeed(void) {
     return sg_speed;
 }
 
-BOOL SGPlayerSpeedAllowedPipeline(void) {
+BOOL SGPlayerSpeedAllowed(void) {
     return tapped();
 }
 
-void SGSetPlayerSpeedPipeline(double speed) {
+void SGSetPlayerSpeed(double speed) {
     if (!tapped()) return;
     sg_speed = (float)speed;
     storeFloat(&sg_speedBits, sg_speed);
     apply();
 }
 
-void SGPlayerSetGainPipeline(float gain) {
+void SGPlayerSetGain(float gain) {
     storeFloat(&sg_gainBits, fmaxf(0, fminf(gain, 1)));
 }
 
-float SGPlayerPitchPipeline(void) {
+float SGPlayerPitch(void) {
     return sg_semitones;
 }
 
-void SGSetPlayerPitchPipeline(float semitones) {
+void SGSetPlayerPitch(float semitones) {
     if ((!SGAudioPipelineAvailable() && !tapped()) || following()) return;
     sg_semitones = semitones;
     apply();
 }
 
-BOOL SGPlayerPitchAvailablePipeline(void) {
+BOOL SGPlayerPitchAvailable(void) {
     return SGAudioPipelineAvailable() || tapped();
 }
 
-BOOL SGPlayerPitchFollowsSpeedPipeline(void) {
+BOOL SGPlayerPitchFollowsSpeed(void) {
     return SGEnabled(SGKeyPitchFollowsSpeed);
 }
 
-void SGSetPlayerPitchFollowsSpeedPipeline(BOOL follows) {
+void SGSetPlayerPitchFollowsSpeed(BOOL follows) {
     SGSetEnabled(SGKeyPitchFollowsSpeed, follows);
     SGTimePitch *unit = atomic_load(&sg_pull);
     if (unit) SGTimePitchSetFollows(unit, follows && tapped());
@@ -399,9 +396,6 @@ void SGSetPlayerPitchFollowsSpeedPipeline(BOOL follows) {
 %end
 
 %ctor {
-    // Only the backend for the master switch's current state installs. Off, this whole file is dormant and the
-    // legacy hub (SpeedPitch.x) runs instead; the two never both drive the output.
-    if (!SGAudioPipelineEnabled()) return;
     SGMigrateKey(@"spotifyglass.speedPitch.follows", SGKeyPitchFollowsSpeed);
     storeFloat(&sg_speedBits, 1);
     storeFloat(&sg_gainBits, 1);
