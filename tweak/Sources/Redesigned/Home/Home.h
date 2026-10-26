@@ -34,6 +34,9 @@ BOOL SGRHomeLook(void);
 #define SGRKeyHomeTopPicksFrom @"spotifyglass.redesign.home.topPicksFrom"
 // The footer of a large card in its cover's color. On until switched off; off, the footer is the plain surface.
 #define SGRKeyHomeTopPicksColour @"spotifyglass.redesign.home.topPicksColour"
+// The title row stays where it is as the feed scrolls under it, over the feed's hard top edge shaped to the row
+// (HomeHeader.x), rather than rising and fading away. Off until switched on; read at launch.
+#define SGRKeyHomeKeepTitle @"spotifyglass.redesign.home.keepTitle"
 // Parts of Home hidden when set (HomeSections.x): the shortcuts grid and the DJ.
 #define SGRKeyHomeHideShortcuts @"spotifyglass.redesign.home.hide.shortcuts"
 #define SGRKeyHomeHideDJ @"spotifyglass.redesign.home.hide.dj"
