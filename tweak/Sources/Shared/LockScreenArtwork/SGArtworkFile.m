@@ -162,8 +162,11 @@ static void crop(AVURLAsset *asset, AVAssetTrack *track, NSURL *into, CGFloat as
         done(asset.URL, @"already the right shape");
         return;
     }
-    CGSize render = shown.width / shown.height > aspect ? CGSizeMake(even(shown.height * aspect), even(shown.height))
-                                                        : CGSizeMake(even(shown.width), even(shown.width / aspect));
+    // The clip is letterboxed into `aspect`, not cropped to it: the whole picture is kept, on black bars, so a
+    // vertical Canvas (9:16) going under a 3:4 key shows end to end rather than cut about its middle. The system
+    // takes only its own two key shapes, so the file must be one of them; this fits the clip inside without loss.
+    CGSize render = shown.width / shown.height > aspect ? CGSizeMake(even(shown.width), even(shown.width / aspect))
+                                                        : CGSizeMake(even(shown.height * aspect), even(shown.height));
     AVMutableVideoCompositionLayerInstruction *layer = [AVMutableVideoCompositionLayerInstruction videoCompositionLayerInstructionWithAssetTrack:track];
     [layer setTransform:CGAffineTransformConcat(upright, CGAffineTransformMakeTranslation((render.width - shown.width) / 2,
                                                                                           (render.height - shown.height) / 2))
@@ -188,8 +191,8 @@ static void crop(AVURLAsset *asset, AVAssetTrack *track, NSURL *into, CGFloat as
         BOOL ok = export.status == AVAssetExportSessionStatusCompleted;
         dispatch_async(queue(), ^{
             if (ok) prune();
-            done(ok ? into : nil, ok ? [NSString stringWithFormat:@"cropped to %.0fx%.0f", render.width, render.height]
-                                     : [NSString stringWithFormat:@"crop failed: %@", export.error.localizedDescription]);
+            done(ok ? into : nil, ok ? [NSString stringWithFormat:@"fit to %.0fx%.0f", render.width, render.height]
+                                     : [NSString stringWithFormat:@"fit failed: %@", export.error.localizedDescription]);
         });
     }];
 }
