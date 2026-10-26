@@ -17,6 +17,7 @@
 #import "Shared/Sing/Sing.h"
 #import "Shared/LyricsSources/LyricsSources.h"
 #import "Shared/LyricsTranslation/LyricsTranslation.h"
+#import "Shared/Lossless/SGLossless.h"
 #import "Settings/SGPageStyle.h"
 #import "Shared/Player/PlayerEvents.h"
 #import "Shared/Haptics/Haptics.h"
@@ -1300,6 +1301,7 @@ typedef struct {
     SGRCreditLabel *_credit;
     NSString *_creditSource;   // the source the credit was settled on, nil until the lyrics name one
     NSArray<SGLyricsLink *> *_creditLinks;
+    BOOL _losslessShown;   // whether the credit carries the Lossless tag now
     CGFloat _fontSize, _margin, _lineGap, _blurPerLine, _maxBlur;
     BOOL _crediting;   // Show source, read once: the page asks for the source on every frame until it has one
     double _clock;
@@ -2250,8 +2252,19 @@ static BOOL anyUntranslated(NSArray<SGKaraokeLine *> *lines) {
 // A credit the source's terms require shows whatever Show source says (Shared/LyricsSources/SpicyLyrics.m).
 - (void)creditTo:(NSString *)source {
     _creditSource = source;
+    [self updateCredit];
+}
+
+// The source line, with " · Lossless" added while a lossless file is actually playing (SGLosslessPlaying),
+// so the page says when FLAC is on. The tag comes and goes within a track — lossless anchors a few seconds
+// in and drops on a seek — so the per-frame update polls it; it stands alone when no source is credited.
+- (void)updateCredit {
+    NSString *source = _creditSource;
     BOOL shown = source.length && (_crediting || SGLyricsCreditRequired(source));
-    NSString *text = shown ? [NSString stringWithFormat:@"Lyrics from %@", source] : nil;
+    _losslessShown = SGLosslessPlaying();
+    NSString *text = shown && _losslessShown ? [NSString stringWithFormat:@"Lyrics from %@ · Lossless", source]
+                   : shown ? [NSString stringWithFormat:@"Lyrics from %@", source]
+                   : _losslessShown ? @"Lossless" : nil;
     _creditLinks = shown ? SGLyricsCreditLinks(source) : nil;
     _credit.accessibilityTraits = _creditLinks.count ? UIAccessibilityTraitLink : UIAccessibilityTraitStaticText;
     if (text == _credit.text || [text isEqualToString:_credit.text]) return;
@@ -2364,6 +2377,8 @@ static BOOL anyUntranslated(NSArray<SGKaraokeLine *> *lines) {
     [self setShowing:_tops != nil];
     // The source is settled a moment after the lines are, so it is asked for until it answers.
     if (!_sample && _lines && !_creditSource) [self creditTo:SGLyricsCreditFor(track)];
+    // Lossless anchors a few seconds into a track and drops on a seek, so the tag is polled, not set once.
+    if (!_sample && SGLosslessPlaying() != _losslessShown) [self updateCredit];
     if (!_tops) return;
     [self alignFade];
     if (_plain) {
