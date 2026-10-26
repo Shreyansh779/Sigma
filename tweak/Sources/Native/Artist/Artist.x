@@ -31,8 +31,19 @@ static UIView *identNamed(UIView *root, NSString *ident) {
 
 #pragma mark - header
 
-static void hide(UIView *view, NSString *key) {
-    if (view && SGHidden(key)) view.hidden = YES;
+static const struct { __unsafe_unretained NSString *ident, *key; } buttons[] = {
+    {@"Components.UI.WatchFeedEntityExplorerButton", SGHideArtistExplore},
+    {@"Curation.FollowButtonElementKit.FollowButton", SGHideArtistFollow},
+    {@"Components.UI.ContextMenuButton", SGHideArtistMore},
+    {@"Components.UI.ShuffleButton", SGHideArtistShuffle},
+};
+
+static BOOL anyHeaderSwitch(void) {
+    if (SGHidden(SGHideArtistVerified) || SGHidden(SGHideArtistListeners)) return YES;
+    for (size_t i = 0; i < sizeof(buttons) / sizeof(buttons[0]); i++) {
+        if (SGHidden(buttons[i].key)) return YES;
+    }
+    return NO;
 }
 
 // The identifier sits on the button; the action is the view the button row arranges around it.
@@ -45,16 +56,12 @@ static UIView *actionHolding(UIView *button, UIView *header) {
 }
 
 static void applyHeader(UIView *header) {
-    hide(identNamed(header, @"ImageHeaderView.VerifiedBadge"), SGHideArtistVerified);
+    // Nothing hidden: skip the per-layout walks of the header tree entirely.
+    if (!anyHeaderSwitch()) return;
+    if (SGHidden(SGHideArtistVerified)) identNamed(header, @"ImageHeaderView.VerifiedBadge").hidden = YES;
     // Its AutoLayoutStackView traps like OverflowStackView below once the label goes hidden.
     if (SGHidden(SGHideArtistListeners)) identNamed(header, @"Components.Header.UI.Metadata").alpha = 0;
 
-    static const struct { __unsafe_unretained NSString *ident, *key; } buttons[] = {
-        {@"Components.UI.WatchFeedEntityExplorerButton", SGHideArtistExplore},
-        {@"Curation.FollowButtonElementKit.FollowButton", SGHideArtistFollow},
-        {@"Components.UI.ContextMenuButton", SGHideArtistMore},
-        {@"Components.UI.ShuffleButton", SGHideArtistShuffle},
-    };
     for (size_t i = 0; i < sizeof(buttons) / sizeof(buttons[0]); i++) {
         if (!SGHidden(buttons[i].key)) continue;
         UIView *action = actionHolding(identNamed(header, buttons[i].ident), header);
