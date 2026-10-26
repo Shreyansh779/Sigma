@@ -175,17 +175,8 @@ static void analyze(AudioUnitRenderActionFlags *flags, const AudioTimeStamp *tim
     if (atomic_load_explicit(&sg_head, memory_order_relaxed) != headBefore) dispatch_semaphore_signal(sg_wake);
 }
 
-// Legacy tap: `refCon` is the unit; only the music's output is heard.
-static OSStatus rendered(void *refCon, AudioUnitRenderActionFlags *flags, const AudioTimeStamp *timestamp, UInt32 bus,
-                         UInt32 frames, AudioBufferList *data) {
-    if (!(*flags & kAudioUnitRenderAction_PostRender) || bus != 0 || !data || !data->mNumberBuffers || !frames) return noErr;
-    if (!atomic_load_explicit(&sg_listening, memory_order_relaxed) || refCon != SGPlayerMusicOutput()) return noErr;
-    analyze(flags, timestamp, frames, data);
-    return noErr;
-}
-
-// Pipeline tap (SGAudioStageHaptics output processor): the pipeline runs this on its music output only, so no
-// unit check is needed.
+// The pipeline runs this (SGAudioStageHaptics output processor) on its music output only; it is heard when the
+// analyzer is listening.
 static OSStatus outputHaptics(void *refCon, AudioUnitRenderActionFlags *flags, const AudioTimeStamp *timestamp, UInt32 bus,
                               UInt32 frames, AudioBufferList *data) {
     if (!(*flags & kAudioUnitRenderAction_PostRender) || bus != 0 || !data || !data->mNumberBuffers || !frames) return noErr;
@@ -237,17 +228,6 @@ static void readFormat(AudioUnit unit) {
     }
     storeDouble(&sg_sampleRateBits, format.mSampleRate);
     atomic_store(&sg_layout, (uint64_t)format.mFormatFlags | (uint64_t)(format.mChannelsPerFrame & 0xffff) << 32 | (uint64_t)bytes << 48);
-}
-
-// The music's output started, changed or changed format (Shared/Player): its format read, the notify on it,
-// and the analyzer started over, since what it held came from before.
-static void listenTo(AudioUnit unit) {
-    if (!unit) return;
-    AudioUnitRemoveRenderNotify(unit, rendered, unit);
-    readFormat(unit);
-    atomic_fetch_add(&sg_generation, 1);
-    OSStatus status = AudioUnitAddRenderNotify(unit, rendered, unit);
-    if (status != noErr) SGLog(@"music haptics: the render notify could not be added (%d)", (int)status);
 }
 
 // Pipeline tap (SGAudioStageHaptics prepare): the pipeline calls this with the music output at every start or
@@ -599,14 +579,9 @@ void SGMusicHapticsWatchTaps(void (^watcher)(float intensity)) {
     mach_timebase_info_data_t timebase;
     mach_timebase_info(&timebase);
     sg_secondsPerTick = (double)timebase.numer / timebase.denom / 1e9;
-    BOOL reachable;
-    if (SGAudioPipelineEnabled()) {
-        // The unified pipeline owns Spotify's output; haptics registers as its output-domain stage.
-        static const SGAudioProcessor processor = {prepareHaptics, outputHaptics};
-        reachable = SGAudioPipelineRegister(SGAudioStageHaptics, &processor);
-    } else {
-        reachable = SGPlayerWatchMusicOutput(listenTo);
-    }
+    // The unified pipeline owns Spotify's output; haptics registers as its output-domain stage.
+    static const SGAudioProcessor processor = {prepareHaptics, outputHaptics};
+    BOOL reachable = SGAudioPipelineRegister(SGAudioStageHaptics, &processor);
     if (!reachable) {
         SGLog(@"music haptics: Spotify's output cannot be reached, Music Haptics is inactive");
         return;

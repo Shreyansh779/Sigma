@@ -1,15 +1,13 @@
-// The pipeline's source slot, the unified-pipeline backend (master switch on). It owns the one source
-// processor Shared/Audio/SGAudioPipeline pulls through, and layers the two source-domain features the legacy
-// hub kept apart:
+// The pipeline's source slot. It owns the one source processor Shared/Audio/SGAudioPipeline pulls through, and
+// layers the two source-domain features:
 //
-//   - the lossless file swap (Shared/Lossless), reached by the canonical SGPlayerSetSourceSelector that
-//     SpeedPitchHub.m dispatches here when the switch is on; and
+//   - the lossless file swap (Shared/Lossless), reached by the canonical SGPlayerSetSourceSelector; and
 //   - Karaoke (Shared/Sing), which registers a renderer through PipelineSource.h.
 //
-// Karaoke sits above the lossless swap, exactly as its stage did in the legacy hub: its renderer pulls its
-// source through the lossless-applied pull, so a file still swaps in under it, and when Karaoke declines a
-// buffer the slot falls through to the lossless path on its own. Spotify's own sound is pulled first and left
-// unconsumed if the pull fails, so the pipeline's own path stays in charge.
+// Karaoke sits above the lossless swap: its renderer pulls its source through the lossless-applied pull, so a
+// file still swaps in under it, and when Karaoke declines a buffer the slot falls through to the lossless path
+// on its own. Spotify's own sound is pulled first and left unconsumed if the pull fails, so the pipeline's own
+// path stays in charge.
 //
 // The epoch names the current source: a track, a seek, a pause or a route change each move it, so an anchor
 // taken for the old one stops. The render-thread selector runs once per source buffer, after Spotify's own
@@ -17,7 +15,7 @@
 #import <AudioToolbox/AudioToolbox.h>
 #import <stdatomic.h>
 #import "Shared/Audio/SGAudioPipeline.h"
-#import "SpeedPitchImpl.h"
+#import "SpeedPitch.h"
 #import "PipelineSource.h"
 
 static _Atomic(uintptr_t) sg_selector;
@@ -26,11 +24,11 @@ static _Atomic uint64_t sg_frame;   // source frames since the epoch began
 static double sg_rate = 44100;
 static _Atomic(SGPipelineSingRenderer) sg_sing;
 
-uint64_t SGPlayerSourceEpochPipeline(void) {
+uint64_t SGPlayerSourceEpoch(void) {
     return atomic_load(&sg_epoch);
 }
 
-void SGPlayerInvalidateSourcePipeline(void) {
+void SGPlayerInvalidateSource(void) {
     atomic_fetch_add(&sg_epoch, 1);
     atomic_store(&sg_frame, 0);
 }
@@ -75,7 +73,7 @@ void SGPipelineSourceEnsureInstalled(void) {
     SGAudioPipelineSetSourceProcessor(sourceSlot, NULL);
 }
 
-void SGPlayerSetSourceSelectorPipeline(SGPlayerSourceSelector selector) {
+void SGPlayerSetSourceSelector(SGPlayerSourceSelector selector) {
     atomic_store(&sg_selector, (uintptr_t)selector);
     // Best effort now (so a file going live mid-track takes effect at once); re-done at the next output prepare.
     SGPipelineSourceEnsureInstalled();
