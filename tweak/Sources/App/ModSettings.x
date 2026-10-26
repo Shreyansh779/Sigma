@@ -24,6 +24,7 @@
 #import "Shared/LiveActivity/LiveActivity.h"
 #import "Shared/AudioEffects/AudioEffectsPage.h"
 #import "Shared/Privacy/Privacy.h"
+#import "Shared/ListeningStats/ListeningStats.h"
 #import "Shared/Flags/Flags.h"
 #import "Shared/Haptics/Haptics.h"
 #import "Shared/Player/PlayerSettings.h"
@@ -97,6 +98,8 @@ static UIViewController *modSettingsPage(void) {
             pageRow(@"Lock screen", @"lock.iphone", SGColorRGB(0x32ADE6), ^UIViewController *{ return SGLockScreenWidgetPage(); }),
             // Vibrations hook Spotify's own controls and its audio, so they answer under either look.
             pageRow(@"Vibrations", @"waveform", UIColor.systemGreenColor, ^UIViewController *{ return SGVibrationsSettingsPage(); }),
+            // Listening stats count plays on the phone under either look, so the row sits with the rest of the data tweaks.
+            pageRow(@"Listening stats", @"chart.bar.fill", UIColor.systemYellowColor, ^UIViewController *{ return SGListeningStatsPage(); }),
             pageRow(@"Privacy & clutter", @"hand.raised.fill", UIColor.systemBlueColor, ^UIViewController *{ return SGPrivacySettingsPage(); }),
         ]),
         SGSection(nil, @[
