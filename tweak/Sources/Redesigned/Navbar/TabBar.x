@@ -110,10 +110,96 @@ static id encoreIconOf(UIView *view) {
     return type && type[0] == '@' ? object_getIvar(view, ivar) : nil;
 }
 
+// An icon of the mod's own choosing, an Encore glyph or an SF Symbol, drawn off screen at the glyphs' size.
+static UIImage *customGlyph(NSString *name, BOOL symbols) {
+    if (!name.length) return nil;
+    static NSCache<NSString *, UIImage *> *cache;
+    if (!cache) cache = [NSCache new];
+    NSString *key = [NSString stringWithFormat:@"%@:%@", symbols ? @"symbols" : @"encore", name];
+    UIImage *cached = [cache objectForKey:key];
+    if (cached) return cached;
+    UIView *custom = SGTabIconView(name, symbols, UIColor.whiteColor);
+    CGSize size = CGSizeMake(24, 24);
+    custom.translatesAutoresizingMaskIntoConstraints = YES;
+    custom.frame = (CGRect){CGPointZero, size};
+    [custom layoutIfNeeded];
+    UIImage *image = renderLayer(custom.layer, size);
+    if (image) [cache setObject:image forKey:key];
+    return image;
+}
+
+// A tab's canonical Encore glyph, built from the named SPTEncoreIcon rather than the live view, so the bar
+// draws its own icon and not whichever one Spotify currently has on the item. Nil for a name Encore has not.
+static UIImage *stockGlyph(NSString *name, BOOL active) {
+    if (!name.length) return nil;
+    static NSCache<NSString *, UIImage *> *cache;
+    if (!cache) cache = [NSCache new];
+    NSString *key = [NSString stringWithFormat:@"%@:%d", name, active];
+    UIImage *cached = [cache objectForKey:key];
+    if (cached) return cached;
+    Class iconClass = NSClassFromString(@"SPTEncoreIcon");
+    Class viewClass = NSClassFromString(@"SPTEncoreIconView");
+    SEL selector = NSSelectorFromString(name);
+    if (!iconClass || !viewClass || ![iconClass respondsToSelector:selector]) return nil;
+    id icon = ((id (*)(id, SEL))objc_msgSend)(iconClass, selector);
+    if (!icon) return nil;
+    SPTEncoreIconView *view = [[viewClass alloc] initWithIcon:icon];
+    view.frame = CGRectMake(0, 0, 24, 24);
+    [view setForegroundColor:UIColor.whiteColor];
+    if ([view respondsToSelector:@selector(setActiveForegroundColor:)]) [view setActiveForegroundColor:UIColor.whiteColor];
+    if ([view respondsToSelector:@selector(setIsActive:)]) [view setIsActive:active];
+    [view layoutIfNeeded];
+    UIImage *image = renderLayer(view.layer, view.bounds.size);
+    if (image) [cache setObject:image forKey:key];
+    return image;
+}
+
+// Apple Music's own tab, by the label Spotify's tab carries, for the Apple Music icons option.
+static NSString *appleMusicSymbolForTab(NSString *title) {
+    static NSDictionary<NSString *, NSString *> *symbols;
+    static dispatch_once_t once;
+    dispatch_once(&once, ^{
+        symbols = @{
+            @"home": @"house.fill",
+            @"listen now": @"house.fill",
+            @"search": @"magnifyingglass",
+            @"your library": @"square.stack.fill",
+            @"library": @"square.stack.fill",
+            @"browse": @"square.grid.2x2.fill",
+            @"radio": @"dot.radiowaves.left.and.right",
+        };
+    });
+    return symbols[title.lowercaseString];
+}
+
 // Encore draws a tab's icon from one SPTEncoreIcon in two states: isActive picks its filled variant.
 // Both are drawn on an icon view of our own, off screen, so the images do not wait for Spotify's
 // views to lay out and paint, and UITabBar swaps image and selectedImage itself.
+//
+// Spotify's own tabs draw a canonical icon of the bar's own: the one the entry names (a custom icon), an
+// Apple Music SF Symbol when that option is on, or the tab's default Encore glyph. The mod's own tabs
+// (SGRTabItemView) keep the icon their entry already draws, through the live path below.
 static UIImage *glyphOf(UIView *item, BOOL active) {
+    if (![NSStringFromClass(item.class) isEqualToString:@"SGRTabItemView"]) {
+        NSString *title = labelIn(item).text;
+        NSDictionary *stockEntry = nil;
+        for (NSDictionary *entry in SGRNavbarLayout()) {
+            if ([entry[SGRNavbarID] isEqualToString:title] && !entry[SGRNavbarURI]) {
+                stockEntry = entry;
+                NSString *name = entry[SGRNavbarIcon];
+                if (SGRNavbarEntryHasCustomIcon(entry) && [name isKindOfClass:NSString.class])
+                    return customGlyph(name, [entry[SGRNavbarIconSet] isEqual:SGTabIconSetSymbols]);
+                break;
+            }
+        }
+        if (SGFlag(SGRKeyNavbarAppleIcons, NO)) {
+            NSString *symbol = appleMusicSymbolForTab(title);
+            if (symbol) return customGlyph(symbol, YES);
+        }
+        UIImage *defaultIcon = stockGlyph(SGRNavbarDefaultIcon(stockEntry[SGRNavbarID] ?: title), active);
+        if (defaultIcon) return defaultIcon;
+    }
+
     UIView *live = iconIn(item);
     if (!live) return nil;
     CGSize size = live.bounds.size;
@@ -375,10 +461,19 @@ static void placeFade(UIView *stockBar, CGRect glass) {
         layer.locations = @[@0, @0.5, @1];
         objc_setAssociatedObject(stockBar, &kFadeKey, fade, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
     }
+    fade.hidden = !SGFlag(SGRKeyNavbarBottomGradient, YES);
     CGFloat top = CGRectGetMinY(glass) - kFadeAbove;
     CGRect frame = CGRectMake(0, top, stockBar.bounds.size.width, CGRectGetMaxY(glass) - top);
     if (!CGRectEqualToRect(fade.frame, frame)) fade.frame = frame;
     if (fade.superview != stockBar || stockBar.subviews.firstObject != fade) [stockBar insertSubview:fade atIndex:0];
+}
+
+// The Appearance page's Bottom navbar gradient switch: shows or hides the fade at once, without a restart.
+void SGRSetTabBarGradientVisible(BOOL visible) {
+    UIView *stockBar = sg_stockBar;
+    SGRBarFade *fade = stockBar ? objc_getAssociatedObject(stockBar, &kFadeKey) : nil;
+    fade.hidden = !visible;
+    SGRRefreshTabBar();
 }
 
 #pragma mark - room for the glass bar
