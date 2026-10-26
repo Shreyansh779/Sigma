@@ -98,7 +98,15 @@
 }
 
 - (void)shareLogs {
-    UIActivityViewController *share = [[UIActivityViewController alloc] initWithActivityItems:@[self.contents ?: @""] applicationActivities:nil];
+    // Share the log as a file, not a raw string: a multi-megabyte NSString activity item hangs some
+    // receivers (WhatsApp) hard enough to freeze the app. A file URL is handled as an attachment.
+    NSURL *file = [NSURL fileURLWithPath:[NSTemporaryDirectory() stringByAppendingPathComponent:@"Sigma-log.txt"]];
+    NSError *error = nil;
+    if (![(self.contents ?: @"") writeToURL:file atomically:YES encoding:NSUTF8StringEncoding error:&error]) {
+        SGLog(@"device logs: couldn't write the log out to share it: %@", error);
+        return;
+    }
+    UIActivityViewController *share = [[UIActivityViewController alloc] initWithActivityItems:@[file] applicationActivities:nil];
     UIView *anchor = self.navigationController.navigationBar;
     share.popoverPresentationController.sourceView = anchor;
     share.popoverPresentationController.sourceRect = CGRectMake(anchor.bounds.size.width - 1, anchor.bounds.size.height - 1, 1, 1);
