@@ -19,6 +19,7 @@
 #import "Redesigned/Player/Player.h"
 #import "Shared/Fonts/Fonts.h"
 #import "Shared/Gestures/Gestures.h"
+#import "Shared/ArtistBlock/ArtistBlock.h"
 #import "Shared/LyricsTranslation/LyricsTranslation.h"
 #import "Shared/Sing/Sing.h"
 #import "Redesigned/Lyrics/LyricsLook.h"
@@ -109,9 +110,15 @@ UIViewController *SGLyricsSettingsPage(void) {
 UIViewController *SGPlayerSettingsPage(void) {
     BOOL native = !SGRedesignedUIStored();
 
+    SGModRow *blocked = SGPageRow(@"Blocked artists", ^UIViewController *{ return SGArtistBlockSettingsPage(); });
+    blocked.value = ^NSString *{
+        return SGFlag(SGKeyArtistBlock, NO) ? @(SGBlockedArtists().count).stringValue : @"Off";
+    };
+
     // AirPods gestures, the lock screen widget and Vibrations have rows of their own on Mod Settings' main page.
     NSMutableArray<SGModSection *> *sections = [NSMutableArray arrayWithObject:SGSection(nil, @[
         SGWithTile(SGPageRow(@"Gestures", ^UIViewController *{ return SGGesturesSettingsPage(); }), @"hand.tap", UIColor.systemBlueColor),
+        SGWithTile(blocked, @"person.crop.circle.badge.xmark", UIColor.systemRedColor),
     ])];
     if (native) {
         [sections addObject:SGSection(nil, @[
