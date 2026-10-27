@@ -11,6 +11,7 @@
 // frame the cover is seen at, so growing it for the transition only made it jump afterwards.
 #import "Core/SGCore.h"
 #import "Redesigned/Kit/SGRKit.h"
+#import "Shared/Player/PlayerSettings.h"
 #import "Player.h"
 
 static const CGFloat kPausedScale = 0.84, kPausedScaleReduceMotion = 0.92;
@@ -180,6 +181,11 @@ static void scaleEveryCover(BOOL animated) {
 }
 
 %hook _TtC35CreativeWorkCommons_CoverArtTiltKit16CoverArtTiltView
+// A single tap opens Spotify's full screen cover; the tap is kept from Spotify while it is hidden.
+- (void)handleTap {
+    if (SGHidden(SGKeyHideFullScreenCover)) return;
+    %orig;
+}
 - (void)layoutSubviews {
     %orig;
     UIView *tilt = (UIView *)self;
