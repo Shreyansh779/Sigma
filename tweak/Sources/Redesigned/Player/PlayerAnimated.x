@@ -93,6 +93,8 @@ static void readLight(NSURL *file, void (^done)(float light)) {
     _looper = [AVPlayerLooper playerLooperWithPlayer:player templateItem:[AVPlayerItem playerItemWithURL:file]];
     _player = player;
     _layer = [AVPlayerLayer playerLayerWithPlayer:player];
+    // Set from the video's own shape once it can be drawn (checkReady): a vertical Canvas fills the player,
+    // Apple Music's 4:3/square cover fits whole with no zoom. Fill until then; corrected before the fade-in.
     _layer.videoGravity = AVLayerVideoGravityResizeAspectFill;
     NSNull *off = NSNull.null;
     _layer.actions = @{@"bounds": off, @"position": off, @"frame": off, @"opacity": off};
@@ -113,6 +115,12 @@ static void readLight(NSURL *file, void (^done)(float light)) {
     void (^ready)(SGRPlayerClip *) = _ready;
     if (!ready || _light < 0 || !_layer.readyForDisplay) return;
     _ready = nil;
+    // The item's presentation size is its displayed shape, rotation already applied. A vertical clip (a
+    // Canvas, ~9:16) fills the player fullscreen; a wider one (Apple Music's 4:3 or square cover) fits whole,
+    // letterboxed, so it is never zoomed or cropped. The fill it was made with stands until the shape is known.
+    CGSize size = _player.currentItem.presentationSize;
+    if (size.width > 0 && size.height > 0 && size.width / size.height >= 0.65)
+        _layer.videoGravity = AVLayerVideoGravityResizeAspect;
     ready(self);
 }
 
