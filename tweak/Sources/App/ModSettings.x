@@ -121,6 +121,34 @@ static UIViewController *modSettingsPage(void) {
 @property (nonatomic) BOOL drawer;
 @end
 
+// Spotify's own row-title font, adopted so the Mod Settings row reads as one of its neighbours rather than the
+// mod's 13pt. It is the font most of the list's labels between 13 and 18pt carry (the row titles: 13pt in the
+// settings list, larger in the drawer, where a tie goes to the larger). In the drawer a 13pt label counts only
+// when there is no larger one: the first 13pt label it once took was a bold badge another tweak adds, and the row
+// read smaller and heavier than its neighbours. Found once per list ([0]) and once per drawer ([1]).
+static UIFont *sg_rowFont[2];
+
+static UIFont *adoptedRowFont(UIView *list, UIView *exclude, BOOL drawer) {
+    if (sg_rowFont[drawer]) return sg_rowFont[drawer];
+    NSCountedSet<UIFont *> *titles = [NSCountedSet set];
+    __block UIFont *best = nil, *small = nil;
+    SGForEachView(list, ^(UIView *v) {
+        if (![v isKindOfClass:UILabel.class] || [v isDescendantOfView:exclude]) return;
+        UILabel *label = (UILabel *)v;
+        CGFloat size = label.font.pointSize;
+        if (label.text.length < 2 || size < 13 || size > 18) return;
+        if (drawer && size < 14) {
+            if (!small) small = label.font;
+            return;
+        }
+        [titles addObject:label.font];
+        NSUInteger count = [titles countForObject:label.font], most = [titles countForObject:best];
+        if (!best || count > most || (count == most && size > best.pointSize)) best = label.font;
+    });
+    sg_rowFont[drawer] = best ?: small;
+    return sg_rowFont[drawer];
+}
+
 @implementation SGModSettingsRow {
     UIImageView *_icon;
     UILabel *_title;
@@ -141,7 +169,9 @@ static UIViewController *modSettingsPage(void) {
 
 - (void)layoutSubviews {
     [super layoutSubviews];
-    _title.font = SGTitleFont();
+    // Spotify's row-title font once the list has rows to read it off, the mod's 13pt until then.
+    UIFont *adopted = self.superview ? adoptedRowFont(self.superview, self, self.drawer) : nil;
+    _title.font = adopted ?: SGTitleFont();
     CGFloat width = self.bounds.size.width, height = self.bounds.size.height, lead = self.drawer ? 4 : 0;
     _icon.frame = CGRectMake(12 + lead, (height - 24) / 2, 24, 24);
     _title.frame = CGRectMake(48 + lead, 0, width - 96, height);
