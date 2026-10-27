@@ -24,6 +24,7 @@
 #import "Native/Appearance/Repaint.h"
 #import "NowPlaying.h"
 #import "Native/Appearance/Appearance.h"
+#import "Shared/Player/PlayerSettings.h"
 
 static const CGFloat kButtonMin = 36, kButtonMax = 48;
 static const CGFloat kArtRadius = 12;
@@ -143,6 +144,11 @@ static UIView *backdropIn(UIView *plane) {
 #pragma mark - what the cover behind it changes around the player
 
 %hook _TtC35CreativeWorkCommons_CoverArtTiltKit16CoverArtTiltView
+// A single tap opens Spotify's full screen cover; the tap is kept from Spotify while it is hidden.
+- (void)handleTap {
+    if (SGHidden(SGKeyHideFullScreenCover)) return;
+    %orig;
+}
 - (void)layoutSubviews {
     %orig;
     if (!backdropOn()) return;
