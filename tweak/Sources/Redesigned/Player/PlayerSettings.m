@@ -322,6 +322,13 @@ static SGModRow *fluidSlider(NSString *title, SGRFluidSetting setting, NSString 
                        ^NSString *(double value) { return [NSString stringWithFormat:@"%.0f%@", value, unit]; });
 }
 
+SGModRow *SGRLyricsHideRow(void) {
+    SGModRow *row = SGChoiceRow(@"Hide the controls", @"A few seconds after the last touch, the lyrics take the room",
+                                SGRKeyLyricsAutoHide, @[@"Off", @"Keep the title", @"Everything"], SGRLyricsHideMode());
+    row.choiceNotes = @[@"The controls stay", @"The cover and the title row stay; the controls fade", @"The lyrics take the whole player"];
+    return row;
+}
+
 UIViewController *SGRPlayerSettingsPage(NSArray *more) {
     SGRPlayerShowcase *showcase = [[SGRPlayerShowcase alloc] initWithFrame:CGRectMake(0, 0, 320, kCardMinHeight)];
     UISegmentedControl *backgrounds = [[UISegmentedControl alloc] initWithItems:SGRPlayerBackgroundNames()];

@@ -447,11 +447,14 @@ Redesigned:
                   round the microphone while it prepares or recovers, a white fill up to the vocal level while it is
                   on, glass when it is off and a dimmed microphone when it has stopped
     Lyrics/       the full screen lyrics page on glass with Apple Music style lyrics over it, always on (SGRKaraokeView,
-                  which the player shows in itself too, Player/PlayerLyrics.x, where after four seconds untouched while
-                  the song plays the controls fade out and the lines take the whole player, until a touch or a pause
-                  brings the controls back; the tap that does so seeks nowhere): lines sung over each other lit together,
+                  which the player shows in itself too, Player/PlayerLyrics.x, where with Hide the controls set to Keep
+                  the title, after four seconds untouched while the song plays, or on a scroll on through the lines, the
+                  controls under the title row fade out and the lines grow down into their room, until a tap where they
+                  were (which seeks), a tap below (which does not), a scroll back or a pause brings the controls back; set
+                  to Everything, the cover and the title row fade with the controls and the lines take the whole safe
+                  area; set to Off, nothing fades): lines sung over each other lit together,
                   the stack moving on once the first is sung out; an instrumental break of 7 s or more held by three dots
-                  that breathe and fill over its length on a Core Animation timeline laid against the song's clock; and
+                  that breathe, fill and hop at a fixed speed over its length on a Core Animation timeline laid against the song's clock; and
                   a line's pronunciation (under the words it spells) and translation, switched on from a glass button in
                   the lyrics' corner that shows only for a song that has them, in the order of sizes the Lyrics page sets
                   (LyricsText.h). Laid out on the Mac against harness/lyrics/
