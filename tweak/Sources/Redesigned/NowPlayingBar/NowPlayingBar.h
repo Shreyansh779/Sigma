@@ -8,10 +8,6 @@
 @class SGModRow, SGModSection;
 
 #define SGRHideBarConnect @"spotifyglass.redesign.hide.barConnect"   // the device button on the card
-// The device button kept on the card in the minimized tab bar's row (NowPlayingBar.x), off unless set: by
-// default the row has the cover, the title and play alone, as the Music app's. Read each time the card goes
-// into the row, so a change shows the next time the bar minimizes.
-#define SGRKeyBarInlineConnect @"spotifyglass.redesign.nowPlayingBar.inlineConnect"
 #define SGRKeyBarHideLike @"spotifyglass.redesign.nowPlayingBar.hideLike"
 
 // The bar's rows, the Mini player section of the Player page (Redesigned/Player/PlayerSettings.m): Apple
@@ -25,6 +21,9 @@ NSArray<SGModRow *> *SGRNowPlayingBarRows(void);
 CGRect SGRNowPlayingCardFrameIn(UIView *host, CGFloat *radius);
 // The round artwork on that card in `host`'s coordinates; CGRectNull when none was found.
 CGRect SGRNowPlayingArtworkFrameIn(UIView *host);
-// Lays the bar out again at once, into the minimized tab bar's slot or back above the bar
-// (Navbar.h's SGRTabBarInlineSlot); TabBar.x calls it inside its own animation.
-void SGRNowPlayingBarFollowTabBar(void);
+// Docks a pill of the mod's own (cover, title, play) into the minimized tab bar's row (`row`, window
+// coordinates, in `host`), the real bar fading out behind it; `docked` NO fades it back to the full card.
+// TabBar.x calls it inside its own minimize animation. `animated` NO is a cut.
+void SGRDockNowPlayingCard(BOOL docked, CGRect row, UIView *host, BOOL animated);
+// Whether something is playing: the bar does not minimize when nothing is, since the dock's pill would be empty.
+BOOL SGRNowPlayingAvailable(void);
