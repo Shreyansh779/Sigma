@@ -44,6 +44,8 @@ static _Thread_local BOOL sg_enlarging;
 // The list section the shortcuts grid is in, from its measuring; NSNotFound until one is.
 static NSInteger sg_gridSection = NSNotFound;
 static _Thread_local CGFloat sg_containerWidth;
+// SGRKeyHomeTopPicksHeading, read at launch.
+static BOOL sg_showHeading;
 // Spotify's card in the running provider: the narrowest size kSmallest or more wide, and how much taller the
 // large one is than it. 0 until a card is made.
 static _Thread_local CGFloat sg_cardWidth, sg_cardGrow;
@@ -60,7 +62,8 @@ static CGFloat targetWidth(void) {
     return round(sg_containerWidth * kCardShare);
 }
 
-// The large shelf's heading goes, and the band it took with it. Its section's header is a boundary item (kind
+// The large shelf's heading goes, and the band it took with it, unless Show Top picks heading keeps both. Its
+// section's header is a boundary item (kind
 // UICollectionElementKindSectionHeader, 39pt tall over the cards on 9.1.90, extending the section); it is made
 // again not extending the section, so it takes no room and lies over the cards' top instead, where it stays in the
 // shelf's visible rect, and so alive with the Show all the header's menu offers, transparent and without touches
@@ -99,7 +102,7 @@ static UICollectionViewCompositionalLayoutSectionProvider wrapped(UICollectionVi
         sg_containerWidth = environment.container.effectiveContentSize.width;
         sg_cardWidth = sg_cardGrow = 0;
         NSCollectionLayoutSection *made = provider(section, environment);
-        if (sg_enlarging && made) headingAside(made, layout);
+        if (sg_enlarging && made && !sg_showHeading) headingAside(made, layout);
         if (layout && sg_cardGrow > 0) objc_setAssociatedObject(layout, &kGrowKey, @(sg_cardGrow), OBJC_ASSOCIATION_RETAIN_NONATOMIC);
         sg_enlarging = was;
         sg_cardWidth = wasWidth;
@@ -514,7 +517,11 @@ static void dropLarge(UICollectionView *shelf) {
     }
     return elements;
 }
+%end
 
+// Installed only while the heading is hidden.
+%group SGRTopPicksHeadingAside
+%hook _TtC16Home_CarouselKit29TouchCancellingCollectionView
 // The large shelf's heading lies over its cards' top (headingAside), transparent and without touches; a shelf no
 // longer large gets it back. Set here, on the shelf's own pass, since the heading's button lays out before the
 // shelf is marked and not after.
@@ -537,10 +544,12 @@ static void dropLarge(UICollectionView *shelf) {
     SGRHomeProbeEnd(SGRHomeProbeShelfLayout, began);
 }
 %end
+%end
 
 UIControl *SGRHomeTopPicksShowAll(NSString **title) {
     UICollectionView *shelf = sg_largeShelf;
-    if (!shelf.window) return nil;
+    // A heading kept on screen offers its own.
+    if (sg_showHeading || !shelf.window) return nil;
     UIView *showAll = SGRFindByIdentifier(shelf, @"Components.UI.NavigationButtonHome", &kShowAllKey);
     __block UIControl *control = [showAll isKindOfClass:UIControl.class] ? (UIControl *)showAll : nil;
     if (!control) SGForEachView(showAll, ^(UIView *v) {
@@ -774,5 +783,7 @@ SGModRow *SGRHomeTopPicksRow(void) {
 
 %ctor {
     if (!SGRedesignedUI() || !SGRHomeLook() || !SGEnabled(SGRKeyHomeTopPicks)) return;
+    sg_showHeading = SGHidden(SGRKeyHomeTopPicksHeading);
     %init;
+    if (!sg_showHeading) %init(SGRTopPicksHeadingAside);
 }
