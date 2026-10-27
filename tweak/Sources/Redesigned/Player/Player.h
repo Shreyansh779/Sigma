@@ -155,6 +155,8 @@ BOOL SGRPlayerPlaceVolume(UIView *stack, UIView *controls, UIView *row, CGFloat 
 void SGRPlayerPlaceVolumeAgain(void);
 // Whether `view` is that row, which the footer's layout must not take for Spotify's controls.
 BOOL SGRPlayerIsVolumeRow(UIView *view);
+// Called after any slider's setValue:animated: (PlayerFooter.x), so the row follows its hidden system slider.
+void SGRPlayerVolumeSliderSet(UISlider *slider);
 
 #pragma mark - the lyrics in the player (PlayerLyrics.x)
 
