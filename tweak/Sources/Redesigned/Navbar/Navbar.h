@@ -7,15 +7,24 @@
 #define SGRKeyNavbar @"spotifyglass.redesign.navbar"
 // Icons only on the glass bar. Off unless set; applies as soon as the bar lays out again.
 #define SGRKeyNavbarHideLabels @"spotifyglass.redesign.navbar.hideLabels"
+// Spotify's own tabs drawn with Apple Music's SF Symbols rather than their Encore glyphs. Off unless set.
+#define SGRKeyNavbarAppleIcons @"spotifyglass.redesign.navbar.appleIcons"
+// The black fade behind the foot of the glass bar. On unless switched off.
+#define SGRKeyNavbarBottomGradient @"spotifyglass.redesign.navbar.bottomGradient"
 
 extern NSString *const SGRNavbarID;      // NSString, the entry's identity
 extern NSString *const SGRNavbarTitle;   // NSString, the name in the settings list and under the icon
 extern NSString *const SGRNavbarURI;     // NSString, the mod's own tabs only: what a tap opens
 extern NSString *const SGRNavbarIcon;    // NSString, an SPTEncoreIcon class method such as "podcasts", or an SF Symbol
 extern NSString *const SGRNavbarIconSet; // NSString, SGTabIconSetSymbols when the icon is an SF Symbol; none is Encore
+extern NSString *const SGRNavbarCustomIcon; // NSNumber, YES when the entry's icon is the user's own, not the tab's default
 extern NSString *const SGRNavbarHidden;  // NSNumber
 NSArray<NSDictionary *> *SGRNavbarLayout(void);
 void SGRSetNavbarLayout(NSArray<NSDictionary *> *layout);
+// The canonical Encore glyph name for one of Spotify's own tabs, by the label under it; nil for an unknown tab.
+NSString *SGRNavbarDefaultIcon(NSString *stockID);
+// Whether a Spotify tab's entry names an icon of the user's own, drawn in place of its canonical one.
+BOOL SGRNavbarEntryHasCustomIcon(NSDictionary *entry);
 // The tabs set apart at the trailing end of the bar (Split tabs), by their entries' identities.
 NSArray<NSString *> *SGRNavbarSplit(void);
 void SGRSetNavbarSplit(NSArray<NSString *> *split);
@@ -32,24 +41,25 @@ void SGRComposeTabBar(UIView *tabBar);
 void SGRLogTabBarRow(UIView *tabBar);
 // Lays the bar out again after the Navbar page changes something, so it does not wait for a touch.
 void SGRRefreshTabBar(void);
+// Shows or hides the black fade behind the foot of the glass bar (SGRKeyNavbarBottomGradient), at once.
+void SGRSetTabBarGradientVisible(BOOL visible);
 // Whether a tab of the composed row is one of the split tabs at its trailing end, for TabBar.x's second bar.
 BOOL SGRTabIsApart(UIView *item);
 // The tab of the mod's own whose page is on screen, which the glass bar shows selected; nil when none is.
 UIView *SGRNavbarLitTab(void);
 // A tap on one of Spotify's tabs: no tab of the mod's own is lit any more.
 void SGRNavbarForgetTab(void);
+// Fires a view's own tap recognizers, the call a real touch ends in (TabBar.x). For the now playing pill, whose
+// tap on the docked card opens the player the way a tap on the bar does.
+BOOL SGRFireTapRecognizers(UIView *view);
 
-// The glass bar minimizes as a page scrolls down (TabBarMinimize.x): it shrinks to two of its tabs, the
-// now playing card coming down between them. On unless switched off; read as each scroll goes.
+// The glass bar minimizes as a page scrolls down (TabBarMinimize.x): it gives way to two round glass buttons at
+// its ends (the dock), the now playing card coming down between them. On unless switched off; read as each scroll goes.
 #define SGRKeyNavbarMinimize @"spotifyglass.redesign.navbar.minimize"
 BOOL SGRTabBarMinimized(void);
-// TabBar.x lays both bars out for it, the now playing bar in the same animation, at once; asked for inside an
-// animation, on the main queue's next turn (SGRTabBarMinimized changes then too). `animated` NO is a cut, made
-// at once.
+// TabBar.x gathers the bar into the dock and docks the card (SGRDockNowPlayingCard) in the same animation.
+// `animated` NO is a cut, made at once. No-op when nothing is playing, since the dock's row has no card then.
 void SGRSetTabBarMinimized(BOOL minimized, BOOL animated);
-// The room between the minimized bar's two tabs, `height` high and centered on them, in `host`'s
-// coordinates: where the now playing card goes. CGRectNull while the bar is not minimized or not on screen.
-CGRect SGRTabBarInlineSlot(UIView *host, CGFloat height);
 
 // A tab's glyph as the glass bar draws it, white, filled when `active` (TabBar.x), for the Tab bar page.
 UIImage *SGRNavbarGlyph(NSDictionary *entry, BOOL active);
