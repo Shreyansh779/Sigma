@@ -82,3 +82,8 @@ BOOL SGRFire(UIControl *control);
 // its identifier, which every version gives it: 9.1.88 draws it in an AdaptiveFaceContainer, 9.1.90 in an Encore
 // button around a listening-activity pulse, which a check by class alone took for something else.
 BOOL SGRIsAvatar(UIView *view);
+
+// Gives a scroll view the hard top edge effect, a dark band, and keeps the soft one SGREdgeEffect.x sets on every
+// other scroll view off it: for text that stays over a page scrolling under it (Home's kept title, HomeHeader.x).
+// iOS 26 on; nothing before.
+void SGRHardTopEdge(UIScrollView *scrollView);

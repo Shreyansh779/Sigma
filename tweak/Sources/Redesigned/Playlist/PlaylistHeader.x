@@ -232,6 +232,12 @@ static void applyHero(UIView *layout, UIView *cover, UIView *plane, UIView *bloc
     CGRect frame = CGRectMake(0, 0, plane.bounds.size.width, bottom);
     if (!CGRectEqualToRect(hero.frame, frame)) hero.frame = frame;
 
+    // Full bleed covers off: Spotify's own square stays above the block, shrinking as the header collapses, and the
+    // hero only reads the picture for the field. A mix's picture is full bleed in Spotify's own layout, so it stays.
+    if (!SGRFullBleedCovers() && [cover.accessibilityIdentifier isEqualToString:@"Components.Header.UI.ArtworkImage"]) {
+        hero.hidden = YES;
+        return;
+    }
     [hero followCover:coverImageIn(cover)];
     conceal(cover);
 }
