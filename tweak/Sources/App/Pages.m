@@ -127,9 +127,11 @@ UIViewController *SGPlayerSettingsPage(void) {
         [sections addObjectsFromArray:SGNativePlayerScreenSections()];
     }
     // Switch to video is the same chip of Spotify's player under either look.
-    [sections addObject:SGSection(native ? nil : @"Hide on the player", @[
-        SGHideRow(@"Switch to video", @"The chip over the title of a song with a music video", SGKeyHideVideoSwitch),
-    ])];
+    SGModRow *video = SGHideRow(@"Switch to video", @"The chip over the title of a song with a music video", SGKeyHideVideoSwitch);
+    // The redesign also hides shuffle and repeat on request, each on its own key (PlayerControls.x).
+    NSArray<SGModRow *> *hidden = native ? @[video]
+        : @[SGHideRow(@"Shuffle", nil, SGRKeyPlayerHideShuffle), SGHideRow(@"Repeat", nil, SGRKeyPlayerHideRepeat), video];
+    [sections addObject:SGSection(native ? nil : @"Hide on the player", hidden)];
 
     [sections addObject:SGNotedSection(@"Lossless", @[
         SGOptionRow(@"Lossless files", @"Your own FLACs in place of Spotify's stream", SGKeyLossless),

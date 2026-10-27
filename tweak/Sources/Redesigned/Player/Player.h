@@ -15,7 +15,7 @@
 //     PlayerArtwork.x    the cover's corners, shadow and paused shrink, the lyric preview under it hidden,
 //                        and every cover gone while an Animated artwork clip shows
 //     PlayerHeader.x     glass behind the close and more buttons
-//     PlayerControls.x   previous, play and next as bare glyphs, monospaced times
+//     PlayerControls.x   previous, play and next as bare glyphs, shuffle and repeat hidden on request, monospaced times
 //     PlayerFooter.x     share gone, lyrics, Connect and queue as one row of three glyphs
 //     PlayerCards.x      every card under the player collapsed, so the list closes up
 //     PlayerScroll.x     the list held at its top, so the player is one screen and cannot be scrolled up
@@ -123,6 +123,12 @@ void SGRPlayerHoldField(void);
 BOOL SGRPlayerFollowsCover(void);
 void SGRPlayerSetCoverAccent(UIColor *cover);
 void SGRPlayerPaintCover(UIView *stack);
+
+// Shuffle and repeat left out of the controls (PlayerControls.x), each on its own switch under Hide on the player, the
+// way the Music app keeps them off its main controls. Off until switched on, read at launch. The buttons go by alpha
+// and keep their slots, so previous, play and next stay where they are, centered.
+#define SGRKeyPlayerHideShuffle @"spotifyglass.redesign.player.hideShuffle"
+#define SGRKeyPlayerHideRepeat @"spotifyglass.redesign.player.hideRepeat"
 
 #pragma mark - landscape lyrics (PlayerLandscape.x)
 
