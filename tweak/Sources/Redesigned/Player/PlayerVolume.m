@@ -119,6 +119,10 @@ BOOL SGRPlayerPlaceVolume(UIView *stack, UIView *controls, UIView *row, CGFloat 
     if (!volume) {
         volume = [SGRVolumeRow new];
         objc_setAssociatedObject(stack, &kVolumeKey, volume, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+        // The stack moves its arranged views around with no pass of the footer (the lyrics, a track whose title wraps, a
+        // row that comes or goes), leaving the row where the stack once had them, over the controls; its own layout runs
+        // the placement again then.
+        SGRObserveLayout(stack, ^(UIView *laidOut) { SGRPlayerPlaceVolumeAgain(); });
     }
     if (volume.superview != stack) [stack addSubview:volume];
     // Halfway between the play button's bottom and the footer glyphs' top, each where it is drawn (convertRect: takes
