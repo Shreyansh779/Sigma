@@ -16,12 +16,13 @@
     tweak/Sources/App/          what brings the layers together: Mod Settings' root and composed pages, the Mod page,
                                 signing, the welcome tour
     tweak/Sources/Diagnostics/  screen dumps, the tree server and the main thread hang sampler of FLEX builds
-    extension/AppGroups/        a dylib loaded by Spotify and its home screen widget that moves Spotify's App Groups
-                                into a group the re-signed IPA has; without it the widget stays a placeholder
+    extension/AppGroups/        a dylib loaded by Spotify and its widget, Siri and notification extensions that moves
+                                Spotify's App Groups and its extension-credentials keychain group into groups the
+                                re-signed IPA has; without it the widget stays a placeholder and Siri asks to verify
     extension/LiveActivity/     the Live Activity widget, a WidgetKit extension of its own, built into the IPA by
                                 scripts/build-extension.sh (Xcode's Swift; an IPA built without Xcode has no card)
     scripts/                    pipeline.sh (build + inject), insert-dylib.py (a load command into
-                                Spotify's widget), install.sh (sign + install), record-trees.py, record-session.py,
+                                Spotify's extensions), install.sh (sign + install), record-trees.py, record-session.py,
                                 dump-log.sh, extract-flags.py, build-extension.sh (the Live Activity's appex and its App Intents
                                 metadata), merge-appintents.py (that metadata into Spotify's own)
     trees/                      recorded view trees, one per screen; the input for every new hook. trees/clean/ holds
