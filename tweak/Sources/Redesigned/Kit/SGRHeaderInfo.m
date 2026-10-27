@@ -9,6 +9,13 @@
 const CGFloat SGRHeaderInfoBottom = 14;
 const CGFloat SGRHeaderInfoTitleRise = 56;
 
+BOOL SGRFullBleedCovers(void) {
+    static BOOL on;
+    static dispatch_once_t once;
+    dispatch_once(&once, ^{ on = SGEnabled(SGRKeyFullBleedCovers); });
+    return on;
+}
+
 // The text kSide in from the edges; Play at least kPlayWidth wide, the Music app's; the gaps between.
 static const CGFloat kSide = 20, kPlayWidth = 148, kRowSpacing = 16, kRowAbove = 16, kAboutAbove = 14;
 // The faces: Spotify's 24pt, overlap and 8pt gap, but no taller than the name's line, so none moves the title.
