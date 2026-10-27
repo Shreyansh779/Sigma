@@ -21,6 +21,7 @@
 #import "Core/SGCore.h"
 #import "Settings/SGModPage.h"
 #import "Redesigned/Kit/SGRKit.h"
+#import "Shared/AnimatedArtwork/AnimatedArtwork.h"
 #import "Player.h"
 
 // Past the plane's edges: above for the pull that dismisses the player, below for the bounce at the end
@@ -172,6 +173,35 @@ static void publishCover(void) {
     if (logged++ < 3) SGLog(@"redesign player: cover %.0fx%.0f published for %@", cover.size.width, cover.size.height, uri);
 }
 
+#pragma mark - Canvas
+
+// The artwork is the picture; Spotify's Canvas video would cover the field and the corners. The player makes
+// its Canvas cell (CanvasNowPlayingCell) only for a track whose metadata names a Canvas, so the keys move under
+// SGMotionHiddenCanvas. ios-feature-canvas.canvas_enabled stays on: forced off, it also took the Canvas off the
+// share sheet's story card (issue #87), which finds it without these keys.
+static char kTrackMetadataKey;
+
+%hook SPTPlayerTrack
+- (NSDictionary *)metadata {
+    NSDictionary *metadata = %orig;
+    if (!metadata) return nil;
+    // Read for every track many times a second, so the stripped copy is kept beside the dictionary it copies,
+    // as LyricsHook.x does. A local file's edit (LocalFileInfo.x) hands out a new one, which is looked at again.
+    NSArray *cached = objc_getAssociatedObject(self, &kTrackMetadataKey);
+    if (cached.firstObject == metadata) return cached.lastObject;
+    NSMutableDictionary *stripped = nil;
+    for (NSString *key in metadata) {
+        if (![key hasPrefix:@"canvas."]) continue;
+        if (!stripped) stripped = [metadata mutableCopy];
+        stripped[[SGMotionHiddenCanvas stringByAppendingString:key]] = metadata[key];
+        [stripped removeObjectForKey:key];
+    }
+    NSDictionary *result = stripped ? [stripped copy] : metadata;   // handed out again, so unchangeable
+    objc_setAssociatedObject(self, &kTrackMetadataKey, @[metadata, result], OBJC_ASSOCIATION_RETAIN);
+    return result;
+}
+%end
+
 %hook _TtC35NowPlaying_ContentLayerPlatformImpl24AccessibleCollectionView
 - (void)layoutSubviews {
     %orig;
@@ -206,8 +236,6 @@ static SGRPlayerCoverWatcher *sg_coverWatcher;
 %ctor {
     // Registered whatever the switch says: the flag rows elsewhere lock to these while it is on.
     NSMutableDictionary<NSString *, id> *flags = [@{
-        // The artwork is the picture; Canvas video would cover the field and the corners.
-        @"ios-feature-canvas.canvas_enabled": @NO,
         // The header, slider and sheets the trees were recorded with (trees/clean/player/01.txt:122
         // id=Context menu, :216 SPTNowPlayingSliderV2).
         @"ios-feature-nowplaying.new_redesign_header_with_context_menu_enabled": @YES,
