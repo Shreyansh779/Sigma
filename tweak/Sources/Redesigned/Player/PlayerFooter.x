@@ -433,6 +433,17 @@ static void layOutFooter(UIViewController *unit) {
 }
 %end
 
+// The hidden volume plumbing's slider changes with no KVO when Spotify sets the volume quietly (a Connect device), so
+// the row is told after any slider's setValue:animated:. Only while the volume row is on; one class check per change.
+%group VolumeSlider
+%hook UISlider
+- (void)setValue:(float)value animated:(BOOL)animated {
+    %orig;
+    SGRPlayerVolumeSliderSet(self);
+}
+%end
+%end
+
 %hook _TtC20NowPlaying_ModesImpl18FooterElementsUnit
 - (void)viewDidLayoutSubviews {
     %orig;
@@ -451,5 +462,6 @@ static void layOutFooter(UIViewController *unit) {
 %ctor {
     if (!SGRedesignedUI()) return;
     %init;
+    if (SGRPlayerVolumeOn()) %init(VolumeSlider);
     SGRequireClasses(@[@"_TtC20NowPlaying_ModesImpl18FooterElementsUnit", @"_TtC32ReinventFree_ReinventFreeNpvImpl30ReinventFreeFooterElementsUnit", @"SPTEncoreIconView"]);
 }
