@@ -49,18 +49,17 @@ BOOL SGRTabIsApart(UIView *item);
 UIView *SGRNavbarLitTab(void);
 // A tap on one of Spotify's tabs: no tab of the mod's own is lit any more.
 void SGRNavbarForgetTab(void);
+// Fires a view's own tap recognizers, the call a real touch ends in (TabBar.x). For the now playing pill, whose
+// tap on the docked card opens the player the way a tap on the bar does.
+BOOL SGRFireTapRecognizers(UIView *view);
 
-// The glass bar minimizes as a page scrolls down (TabBarMinimize.x): it shrinks to two of its tabs, the
-// now playing card coming down between them. On unless switched off; read as each scroll goes.
+// The glass bar minimizes as a page scrolls down (TabBarMinimize.x): it gives way to two round glass buttons at
+// its ends (the dock), the now playing card coming down between them. On unless switched off; read as each scroll goes.
 #define SGRKeyNavbarMinimize @"spotifyglass.redesign.navbar.minimize"
 BOOL SGRTabBarMinimized(void);
-// TabBar.x lays both bars out for it, the now playing bar in the same animation, at once; asked for inside an
-// animation, on the main queue's next turn (SGRTabBarMinimized changes then too). `animated` NO is a cut, made
-// at once.
+// TabBar.x gathers the bar into the dock and docks the card (SGRDockNowPlayingCard) in the same animation.
+// `animated` NO is a cut, made at once. No-op when nothing is playing, since the dock's row has no card then.
 void SGRSetTabBarMinimized(BOOL minimized, BOOL animated);
-// The room between the minimized bar's two tabs, `height` high and centered on them, in `host`'s
-// coordinates: where the now playing card goes. CGRectNull while the bar is not minimized or not on screen.
-CGRect SGRTabBarInlineSlot(UIView *host, CGFloat height);
 
 // A tab's glyph as the glass bar draws it, white, filled when `active` (TabBar.x), for the Tab bar page.
 UIImage *SGRNavbarGlyph(NSDictionary *entry, BOOL active);
