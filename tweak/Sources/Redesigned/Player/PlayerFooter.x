@@ -43,7 +43,7 @@ static const CGFloat kVolumeMargin = 24;
 // And the controls go up this much over it, so the gaps above and below the volume row match.
 static const CGFloat kVolumeLift = 10;
 
-static char kConnectKey, kShareKey, kTrimmerKey, kQueueKey, kLyricsGlyphKey, kReachKey;
+static char kConnectKey, kShareKey, kTrimmerKey, kQueueKey, kLyricsGlyphKey, kReachKey, kGlyphSeenKey;
 static __weak SGRGlyphButton *sg_lyricsGlyph;
 
 // The view the footer's stack view arranges around `view`.
@@ -273,6 +273,34 @@ static void layOutFooter(UIViewController *unit) {
               connectFrom, glyph ? @"glyph" : @"button", round(width * kMiddle), queueFrom, round(width * (rtl ? kLeading : kTrailing)), share ? @"gone" : @"not found");
     });
 }
+
+// The Connect button lays itself out again when the device changes (its name comes or goes, another device's glyph, the
+// button's width with them), with no pass of the footer around it: the glyph moved inside it while the footer's move,
+// worked out from where the glyph was, stayed, so Connect slid off its place. The footer is laid out again whenever the
+// glyph moves, and its pass puts the button back on its place.
+%hook _TtC23Connect_EntryPointsImpl37ConnectButtonOutputSwitcherViewHolder
+- (void)layoutSubviews {
+    %orig;
+    UIView *connect = (UIView *)self;
+    UIView *glyph = connectGlyphIn(connect);
+    if (!glyph) return;
+    // The glyph's place in the button and the button's size: the glyph keeps its place at the button's leading edge while
+    // the button grows and shrinks with the device's name, and the element holding it is laid out again round its new
+    // size, so either one moving is a move of the glyph.
+    CGRect seen = [glyph convertRect:glyph.bounds toView:connect];
+    seen.size = connect.bounds.size;
+    NSValue *was = objc_getAssociatedObject(connect, &kGlyphSeenKey);
+    if (was && CGRectEqualToRect(was.CGRectValue, seen)) return;
+    objc_setAssociatedObject(connect, &kGlyphSeenKey, [NSValue valueWithCGRect:seen], OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    if (!was) return;
+    // The footer unit's view: the first ancestor a controller owns.
+    for (UIView *v = connect.superview; v; v = v.superview) {
+        if (!unitOf(v)) continue;
+        [v setNeedsLayout];
+        break;
+    }
+}
+%end
 
 %hook _TtC20NowPlaying_ModesImpl18FooterElementsUnit
 - (void)viewDidLayoutSubviews {
