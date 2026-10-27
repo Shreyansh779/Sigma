@@ -96,7 +96,7 @@ CGRect SGRPlayerCoverFrameIn(UIView *host);
 // title -- in `host`'s coordinates; CGRectNull when no cover has laid out.
 CGRect SGRPlayerArtworkAreaIn(UIView *host);
 // Hides the cover on screen and its shadow, or gives them back to the clip's rule, for a stand-in to fly
-// in its place (PlayerMorph.x).
+// in its place (PlayerMorph.x). Until NO, every cover laid out on screen is hidden too, the first open's included.
 void SGRPlayerSetCoverHidden(BOOL hidden);
 // Every cover in the list going or coming back over `duration`, as SGRPlayerAnimatedShowing now says.
 void SGRPlayerCoversFollowClip(NSTimeInterval duration);
