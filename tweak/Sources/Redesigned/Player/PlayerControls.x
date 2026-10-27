@@ -31,7 +31,7 @@ static const NSTimeInterval kSpinnerCheck = 0.6;
 // one sent before the player caught up, for this long; after it the player's word is final.
 static const NSTimeInterval kTapTrust = 1.2;
 
-static char kPreviousKey, kNextKey, kPlayKey, kGlyphKey, kTakeKey, kRemainingKey;
+static char kPreviousKey, kNextKey, kPlayKey, kGlyphKey, kTakeKey, kRemainingKey, kShuffleKey, kRepeatKey;
 static __weak UIView *sg_playView;
 static __weak UIButton *sg_playButton;
 static CFTimeInterval sg_tappedUntil;
@@ -175,15 +175,63 @@ static void playGlyph(UIView *host) {
     dispatch_once(&once, ^{ SGLog(@"redesign player: play glyph over %@ (disc %@ suppressed), spinner %@", NSStringFromClass(play.class), NSStringFromClass(disc.class), spinnerShowing(button) ? @"showing" : @"hidden"); });
 }
 
+#pragma mark - shuffle and repeat
+
+// Each switched on under Hide on the player (SGRKeyPlayerHideShuffle, SGRKeyPlayerHideRepeat), read at launch. By
+// alpha in their slots: the row is Spotify's stack of five, and setting `hidden` in an Encore stack crashes. Kept by
+// SGRSuppress, since Spotify's state render sets a button's alpha back to 1 when shuffle or repeat changes.
+static BOOL sg_hideShuffle, sg_hideRepeat;
+static NSString *const kShuffleID = @"Components.UI.ShuffleButton", *const kRepeatID = @"Nowplaying-RepeatButton";
+
+static BOOL isHiddenButton(UIView *view) {
+    NSString *identifier = view.accessibilityIdentifier;
+    return (sg_hideShuffle && [identifier isEqualToString:kShuffleID])
+        || (sg_hideRepeat && [identifier isEqualToString:kRepeatID]);
+}
+
+// Spotify also swaps in a new button a moment after the controls lay out (seen for repeat on 9.1.90: the instance
+// found leaves the window 40 ms later and another arrives at alpha 1), with no layout pass after it. The new one is
+// caught as it arrives. The class is an Encore button's, taken from the first one found (`class`, not a KVO class
+// it may be observed through), since its name carries a build hash. It is the class of every Encore button, the
+// playlist, album and artist headers' shuffle among them, so only one inside the player's controls goes; any other
+// pays a window check and an identifier compare as it moves.
+%group SGRPlayerButtonArrival
+%hook SGRPlayerButton
+- (void)didMoveToWindow {
+    %orig;
+    UIView *view = (UIView *)self;
+    if (view.window && isHiddenButton(view) && sg_controlsHost && [view isDescendantOfView:sg_controlsHost]) SGRSuppress(view);
+}
+%end
+%end
+
+static void suppressButton(UIView *button) {
+    if (!button) return;
+    SGRSuppress(button);
+    static BOOL hooked;
+    if (hooked) return;
+    hooked = YES;
+    %init(SGRPlayerButtonArrival, SGRPlayerButton = button.class);
+}
+
+// Each is looked for only in its own end of the row, so a row without it (a podcast's) costs a walk of one
+// element, not the unit.
+static void hideShuffleAndRepeat(UIView *host, UIStackView *row) {
+    if (sg_hideShuffle) suppressButton(SGRFindByIdentifier(row.arrangedSubviews.firstObject, kShuffleID, &kShuffleKey));
+    if (sg_hideRepeat) suppressButton(SGRFindByIdentifier(row.arrangedSubviews.lastObject, kRepeatID, &kRepeatKey));
+}
+
 static void layOutControls(UIViewController *unit) {
     UIView *host = unit.viewIfLoaded;
     if (!host) return;
     // The unit lays out before its row does, and the glyphs are centred on the buttons in it.
-    [SGRowIn(host) layoutIfNeeded];
+    UIStackView *row = SGRowIn(host);
+    [row layoutIfNeeded];
     sg_controlsHost = host;
     skipGlyph(host, @"SPTNowPlayingPreviousTrackButton", &kPreviousKey, @"backward.fill");
     skipGlyph(host, @"SPTNowPlayingNextTrackButton", &kNextKey, @"forward.fill");
     playGlyph(host);
+    hideShuffleAndRepeat(host, row);
 }
 
 %hook _TtC20NowPlaying_ModesImpl28PlaybackControlsElementsUnit
@@ -443,6 +491,8 @@ static void layOutTimes(UIViewController *unit) {
 %ctor {
     if (!SGRedesignedUI()) return;
     %init;
+    sg_hideShuffle = SGHidden(SGRKeyPlayerHideShuffle);
+    sg_hideRepeat = SGHidden(SGRKeyPlayerHideRepeat);
     sg_controlsWatcher = [SGRPlayerControlsWatcher new];
     SGAddPlayerStateObserver(sg_controlsWatcher);
     SGRequireClasses(@[
