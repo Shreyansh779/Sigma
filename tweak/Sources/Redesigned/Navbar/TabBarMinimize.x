@@ -10,6 +10,7 @@
 #import "Core/SGCore.h"
 #import "Navbar.h"
 #import "MinimizeStep.h"
+#import "Redesigned/NowPlayingBar/NowPlayingBar.h"
 #import "Shared/Player/PlayerEvents.h"
 
 static Class sg_containerClass;
@@ -25,6 +26,8 @@ static BOOL inContainer(UIView *view) {
 
 static void scrolled(UIScrollView *scrollView) {
     if ((!scrollView.isTracking && !scrollView.isDecelerating) || scrollView == sg_other) return;
+    // Nothing playing: the dock's row would have no card, so the bar never minimizes (one already minimized can come back).
+    if (!SGRTabBarMinimized() && !SGRNowPlayingAvailable()) return;
     CGFloat offset = scrollView.contentOffset.y;
     if (scrollView != sg_page) {
         if (!inContainer(scrollView)) {
