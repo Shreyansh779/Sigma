@@ -123,6 +123,11 @@ void SGRPlayerHoldField(void);
 BOOL SGRPlayerFollowsCover(void);
 void SGRPlayerSetCoverAccent(UIColor *cover);
 void SGRPlayerPaintCover(UIView *stack);
+// Whether a control is drawn lit: in the accent, judged as Follow the cover judges what it repaints.
+BOOL SGRPlayerAccentLike(UIColor *color);
+// The color an image is drawn in: the average of its opaque pixels, read once at 16 by 16 and kept on the image; nil
+// for one with too few.
+UIColor *SGRPlayerImageInk(UIImage *image);
 
 // Shuffle and repeat left out of the controls (PlayerControls.x), each on its own switch under Hide on the player, the
 // way the Music app keeps them off its main controls. Off until switched on, read at launch. The buttons go by alpha
