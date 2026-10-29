@@ -13,6 +13,11 @@ static const NSTimeInterval kFadeIn = 0.6, kFadeOut = 0.45;
 // less than the least, and more under the lyrics. Over it, the shade Fluid artwork has under the controls.
 static const float kCeiling = 0.18f, kCeilingContrast = 0.09f, kUnknownLight = 0.35f;
 static const float kDimLeast = 0.1f, kDimMost = 0.8f;
+// The dim lies only where text does, as the Music app's does: a band at the top under the status bar and header, and
+// from above the title down, clear over the cover between (issue #101: over the whole clip it took up to four fifths of
+// its light). The top band is whole to this share of the view, gone kDimFade points below it; the bottom darkens from
+// kDimBottom down, where the shade starts.
+static const CGFloat kDimTop = 0.14f, kDimFade = 48.f, kDimBottom = 0.45f;
 static const float kShadeMiddle = 0.18f, kShadeBottom = 0.4f;
 static const NSTimeInterval kReadyWithin = 5;
 
@@ -173,7 +178,7 @@ static void readLight(NSURL *file, void (^done)(float light)) {
 
 @implementation SGRPlayerAnimatedView {
     CALayer *_clips;
-    CALayer *_dim;
+    CAGradientLayer *_dim;
     CAGradientLayer *_shade;
     NSMutableArray<SGRPlayerClip *> *_leaving;   // under the one coming in until it is in
     BOOL _playing;
@@ -197,12 +202,18 @@ static float dimFor(float light) {
     _leaving = [NSMutableArray array];
     NSNull *off = NSNull.null;
     NSDictionary *still = @{@"bounds": off, @"position": off, @"frame": off, @"opacity": off, @"sublayers": off};
+    NSDictionary *stillGradient = @{@"bounds": off, @"position": off, @"frame": off, @"opacity": off, @"sublayers": off,
+                                    @"colors": off, @"locations": off};
     _clips = [CALayer layer];
     _clips.actions = still;
     [self.layer addSublayer:_clips];
-    _dim = [CALayer layer];
-    _dim.actions = still;
-    _dim.backgroundColor = UIColor.blackColor.CGColor;
+    _dim = [CAGradientLayer layer];
+    _dim.actions = stillGradient;
+    // Black at the top and from above the title down, clear over the cover between; its opacity scales all of it with how
+    // bright the clip is (dimFor). Locations in layoutSubviews, where the view's height gives the top band's fade.
+    UIColor *dimBlack = UIColor.blackColor;
+    id dimSolid = (id)dimBlack.CGColor, dimClear = (id)[dimBlack colorWithAlphaComponent:0].CGColor;
+    _dim.colors = @[dimSolid, dimSolid, dimClear, dimClear, dimSolid];
     _light = kUnknownLight;
     _dim.opacity = dimFor(_light);
     [self.layer addSublayer:_dim];
@@ -226,6 +237,10 @@ static float dimFor(float light) {
     CGRect bounds = self.bounds;
     _clips.frame = bounds;
     _dim.frame = bounds;
+    // The top band is whole to kDimTop of the view and gone kDimFade points below it; the bottom goes dark from kDimBottom.
+    CGFloat height = MAX(1, bounds.size.height);
+    CGFloat topFade = MIN(kDimTop + kDimFade / height, kDimBottom);
+    _dim.locations = @[@0, @(kDimTop), @(topFade), @(kDimBottom), @1];
     _shade.frame = bounds;
     _clip.layer.frame = bounds;
     for (SGRPlayerClip *clip in _leaving) clip.layer.frame = bounds;
