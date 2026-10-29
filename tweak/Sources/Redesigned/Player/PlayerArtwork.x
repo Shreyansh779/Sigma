@@ -11,6 +11,7 @@
 // frame the cover is seen at, so growing it for the transition only made it jump afterwards.
 #import "Core/SGCore.h"
 #import "Redesigned/Kit/SGRKit.h"
+#import "Shared/Player/PlayerSettings.h"
 #import "Player.h"
 
 static const CGFloat kPausedScale = 0.84, kPausedScaleReduceMotion = 0.92;
@@ -63,13 +64,15 @@ static void scaleCover(UIView *tilt, CGFloat scale) {
 #pragma mark - where the cover is
 
 // The tilt view of the cover on screen: the queue is a cover per cell and the cells out of view are
-// kept hidden (player/02.txt:521), so the one showing is the one in a window with nothing hidden over it.
+// kept hidden (player/02.txt:521), so the one showing is the one in a window with nothing hidden over it. On the first
+// open the cells off to the side are not hidden yet, so it must also sit across the screen, not a page off it.
 static UIView *showingTilt(void) {
     for (UIView *tilt in sg_tilts) {
-        if (!tilt.window) continue;
-        BOOL hidden = NO;
-        for (UIView *v = tilt; v && !hidden; v = v.superview) hidden = v.hidden;
-        if (!hidden) return tilt;
+        UIWindow *window = tilt.window;
+        if (!window) continue;
+        if (!SGShownUnder(tilt, nil)) continue;
+        CGFloat middle = CGRectGetMidX([tilt convertRect:tilt.bounds toView:nil]);
+        if (middle >= 0 && middle <= CGRectGetWidth(window.bounds)) return tilt;
     }
     return nil;
 }
@@ -104,6 +107,9 @@ CGRect SGRPlayerArtworkAreaIn(UIView *host) {
 
 // The cover hidden for a stand-in, so the same one comes back if the list moved on meanwhile.
 static __weak UIView *sg_hiddenCover;
+// Asked for while no cover was laid out yet (the first open): the cover is hidden in the layout pass that makes it, so
+// its first frame on screen is already hidden (the hook below).
+static BOOL sg_coverKeptHidden;
 // The tilt views whose cover this file took away, the only ones it gives back: any alpha Spotify sets on
 // a cover itself is left alone.
 static NSHashTable<UIView *> *sg_gone;
@@ -143,6 +149,7 @@ void SGRPlayerCoversFollowClip(NSTimeInterval duration) {
 }
 
 void SGRPlayerSetCoverHidden(BOOL hidden) {
+    sg_coverKeptHidden = hidden;
     UIView *was = sg_hiddenCover;
     sg_hiddenCover = nil;
     if (was) {
@@ -180,6 +187,11 @@ static void scaleEveryCover(BOOL animated) {
 }
 
 %hook _TtC35CreativeWorkCommons_CoverArtTiltKit16CoverArtTiltView
+// A single tap opens Spotify's full screen cover; the tap is kept from Spotify while it is hidden.
+- (void)handleTap {
+    if (SGHidden(SGKeyHideFullScreenCover)) return;
+    %orig;
+}
 - (void)layoutSubviews {
     %orig;
     UIView *tilt = (UIView *)self;
@@ -201,6 +213,12 @@ static void scaleEveryCover(BOOL animated) {
     plate.center = cover.center;
     // The same value an animation in flight is heading to, so a layout pass never cuts one short.
     scaleCover(tilt, currentScale());
+    // The player's cover is held hidden from the first frame: the first open lays it out between two frames of the morph,
+    // so a newly laid out cover that is the one showing is hidden in this pass too (PlayerMorph.x). Not animated, though
+    // this pass may run inside Spotify's transition.
+    if (sg_coverKeptHidden && cover != sg_hiddenCover && showingTilt() == tilt) {
+        [UIView performWithoutAnimation:^{ SGRPlayerSetCoverHidden(YES); }];
+    }
     // A cell laid out later, or reused, takes the rule as it stands.
     [UIView performWithoutAnimation:^{ showCover(tilt); }];
 
