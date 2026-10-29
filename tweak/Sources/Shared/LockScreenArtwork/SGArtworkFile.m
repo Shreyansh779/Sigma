@@ -197,7 +197,9 @@ static void crop(AVURLAsset *asset, AVAssetTrack *track, NSURL *into, CGFloat as
 }
 
 void SGArtworkCrop(NSURL *file, NSString *identifier, CGFloat aspect, void (^done)(NSURL *cropped, NSString *note)) {
-    NSURL *into = fileFor([NSString stringWithFormat:@"%@-%.2f.mp4", identifier, aspect]);
+    // -v2: the crop went from letterbox back to centre-crop, so the key changes to drop the letterboxed clips
+    // cached under the old name (they would otherwise be reused and keep their black bars).
+    NSURL *into = fileFor([NSString stringWithFormat:@"%@-%.2f-v2.mp4", identifier, aspect]);
     if ([NSFileManager.defaultManager fileExistsAtPath:into.path]) {
         dispatch_async(queue(), ^{ touch(into); });
         done(into, @"cropped already");
