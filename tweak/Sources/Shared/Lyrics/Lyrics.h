@@ -128,6 +128,8 @@ BOOL SGKaraokeLooking(NSString *trackID);
 // The headers spclient needs to answer a request as the signed-in app, read off Spotify's own requests:
 // `use` runs at once when one has been seen, else with the first. Never logged or stored. Main queue.
 void SGSpclientHeaders(void (^use)(NSDictionary<NSString *, NSString *> *headers));
+// Drops the headers spclient turned down, so the next ask waits for Spotify's own next request. Main queue.
+void SGSpclientHeadersForget(void);
 // Asks spclient for a track's lyrics once, with the headers of Spotify's own requests, for when no
 // page of Spotify's has asked for them, e.g. with the app in the background.
 void SGKaraokeRequestLyrics(NSString *trackID);

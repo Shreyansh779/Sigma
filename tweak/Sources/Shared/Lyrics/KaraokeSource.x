@@ -85,6 +85,10 @@ void SGSpclientHeaders(void (^use)(NSDictionary<NSString *, NSString *> *headers
     [sg_headersWaiting addObject:[use copy]];
 }
 
+void SGSpclientHeadersForget(void) {
+    sg_spclientHeaders = nil;
+}
+
 static SPTPlayerState *playerState(void);
 static NSString *idOf(SPTPlayerTrack *track);
 

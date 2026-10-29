@@ -109,6 +109,8 @@ void SGMotionCanvasFromService(NSString *uri, void (^done)(NSURL *canvas)) {
             static NSUInteger logged;
             if (logged++ < 5 || status != 200) SGLog(@"motion: Canvas service for %@: %ld, %@", uri, (long)status, address ? @"a video" : @"none");
             if (status == 200) sg_answers[uri] = address ?: (id)NSNull.null;
+            // A refused token is not kept: the next ask waits for Spotify's own spclient request to carry a fresh one.
+            if (status == 401) SGSpclientHeadersForget();
             NSArray *waiting = sg_asking[uri];
             [sg_asking removeObjectForKey:uri];
             for (void (^waiter)(NSURL *) in waiting) waiter(address ? [NSURL URLWithString:address] : nil);
