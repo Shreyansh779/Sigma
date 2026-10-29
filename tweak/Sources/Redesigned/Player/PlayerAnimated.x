@@ -163,6 +163,10 @@ static void coverFrame(NSURL *file, void (^done)(UIImage *frame)) {
     // Set from the video's own shape once it can be drawn (checkReady): a Canvas fills the player fullscreen,
     // Apple Music's 3:4/square cover fits whole over a blurred fill of the cover. Fill until then.
     _video.videoGravity = AVLayerVideoGravityResizeAspectFill;
+    // The aspect-fit letterbox must be clear, or the layer paints its bars with an opaque (light, in a light
+    // appearance) background over the blurred fill behind the clip, which is the whole point of the fill.
+    _front.opaque = NO;
+    _video.backgroundColor = UIColor.clearColor.CGColor;
     _covers = YES;   // a fill clip covers the plane; a fit clip only if its blurred fill is built (checkReady)
     [_view addSubview:_front];
     [_video addObserver:self forKeyPath:@"readyForDisplay" options:NSKeyValueObservingOptionInitial context:&kReadyContext];
