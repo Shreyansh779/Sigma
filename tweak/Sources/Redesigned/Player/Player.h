@@ -15,7 +15,7 @@
 //     PlayerArtwork.x    the cover's corners, shadow and paused shrink, the lyric preview under it hidden,
 //                        and every cover gone while an Animated artwork clip shows
 //     PlayerHeader.x     glass behind the close and more buttons
-//     PlayerControls.x   previous, play and next as bare glyphs, monospaced times
+//     PlayerControls.x   previous, play and next as bare glyphs, shuffle and repeat hidden on request, monospaced times
 //     PlayerFooter.x     share gone, lyrics, Connect and queue as one row of three glyphs
 //     PlayerCards.x      every card under the player collapsed, so the list closes up
 //     PlayerScroll.x     the list held at its top, so the player is one screen and cannot be scrolled up
@@ -96,7 +96,7 @@ CGRect SGRPlayerCoverFrameIn(UIView *host);
 // title -- in `host`'s coordinates; CGRectNull when no cover has laid out.
 CGRect SGRPlayerArtworkAreaIn(UIView *host);
 // Hides the cover on screen and its shadow, or gives them back to the clip's rule, for a stand-in to fly
-// in its place (PlayerMorph.x).
+// in its place (PlayerMorph.x). Until NO, every cover laid out on screen is hidden too, the first open's included.
 void SGRPlayerSetCoverHidden(BOOL hidden);
 // Every cover in the list going or coming back over `duration`, as SGRPlayerAnimatedShowing now says.
 void SGRPlayerCoversFollowClip(NSTimeInterval duration);
@@ -123,6 +123,17 @@ void SGRPlayerHoldField(void);
 BOOL SGRPlayerFollowsCover(void);
 void SGRPlayerSetCoverAccent(UIColor *cover);
 void SGRPlayerPaintCover(UIView *stack);
+// Whether a control is drawn lit: in the accent, judged as Follow the cover judges what it repaints.
+BOOL SGRPlayerAccentLike(UIColor *color);
+// The color an image is drawn in: the average of its opaque pixels, read once at 16 by 16 and kept on the image; nil
+// for one with too few.
+UIColor *SGRPlayerImageInk(UIImage *image);
+
+// Shuffle and repeat left out of the controls (PlayerControls.x), each on its own switch under Hide on the player, the
+// way the Music app keeps them off its main controls. Off until switched on, read at launch. The buttons go by alpha
+// and keep their slots, so previous, play and next stay where they are, centered.
+#define SGRKeyPlayerHideShuffle @"spotifyglass.redesign.player.hideShuffle"
+#define SGRKeyPlayerHideRepeat @"spotifyglass.redesign.player.hideRepeat"
 
 #pragma mark - landscape lyrics (PlayerLandscape.x)
 
@@ -144,6 +155,8 @@ BOOL SGRPlayerPlaceVolume(UIView *stack, UIView *controls, UIView *row, CGFloat 
 void SGRPlayerPlaceVolumeAgain(void);
 // Whether `view` is that row, which the footer's layout must not take for Spotify's controls.
 BOOL SGRPlayerIsVolumeRow(UIView *view);
+// Called after any slider's setValue:animated: (PlayerFooter.x), so the row follows its hidden system slider.
+void SGRPlayerVolumeSliderSet(UISlider *slider);
 
 #pragma mark - the lyrics in the player (PlayerLyrics.x)
 
