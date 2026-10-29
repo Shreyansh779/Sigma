@@ -107,6 +107,20 @@ static UIImage *blurredFill(UIImage *image) {
     return result;
 }
 
+// One frame of the clip, at a modest size, read off the main thread for the blurred fill; `done` on the main
+// queue, nil if none. The clip's own frame always exists and matches the cover, where the now playing artwork
+// may be empty for a static cover played as a clip.
+static void coverFrame(NSURL *file, void (^done)(UIImage *frame)) {
+    AVAssetImageGenerator *generator = [AVAssetImageGenerator assetImageGeneratorWithAsset:[AVURLAsset URLAssetWithURL:file options:nil]];
+    generator.appliesPreferredTrackTransform = YES;
+    generator.maximumSize = CGSizeMake(320, 320);
+    [generator generateCGImageAsynchronouslyForTime:CMTimeMakeWithSeconds(0, 600) completionHandler:^(CGImageRef frame, CMTime actual, NSError *error) {
+        (void)generator;
+        UIImage *image = frame ? [UIImage imageWithCGImage:frame] : nil;
+        dispatch_async(dispatch_get_main_queue(), ^{ done(image); });
+    }];
+}
+
 @interface SGRPlayerClip : NSObject
 @property (nonatomic, readonly) NSURL *file;
 @property (nonatomic, readonly) UIView *view;   // the clip, with a blurred fill of the cover behind it when it fits
@@ -125,6 +139,8 @@ static UIImage *blurredFill(UIImage *image) {
     AVPlayerLooper *_looper;
     SGRClipVideo *_front;   // the clip itself
     AVPlayerLayer *_video;  // _front's layer
+    UIImage *_coverImage;   // a frame of the clip, for the blurred fill
+    BOOL _frameTried;       // the frame has been read (or failed)
     BOOL _observing;
 }
 
@@ -159,6 +175,13 @@ static UIImage *blurredFill(UIImage *image) {
         clip->_light = light;
         [clip checkReady];
     });
+    coverFrame(file, ^(UIImage *frame) {
+        SGRPlayerClip *clip = weakSelf;
+        if (!clip) return;
+        clip->_coverImage = frame;
+        clip->_frameTried = YES;
+        [clip checkReady];
+    });
     return self;
 }
 
@@ -168,7 +191,7 @@ static UIImage *blurredFill(UIImage *image) {
 
 - (void)checkReady {
     void (^ready)(SGRPlayerClip *) = _ready;
-    if (!ready || _light < 0 || !_video.readyForDisplay) return;
+    if (!ready || _light < 0 || !_frameTried || !_video.readyForDisplay) return;
     _ready = nil;
     // The item's presentation size is its displayed shape, rotation already applied. A Canvas, vertical (~9:16)
     // or landscape (~16:9), fills the player fullscreen, cropping the excess. Only a roughly portrait-to-square
@@ -178,17 +201,21 @@ static UIImage *blurredFill(UIImage *image) {
     CGFloat ratio = size.width > 0 && size.height > 0 ? size.width / size.height : 0;
     if (ratio >= 0.65 && ratio <= 1.2) {
         _video.videoGravity = AVLayerVideoGravityResizeAspect;
-        // No cover to blur (not read yet): leave the field uncovered so its Fluid artwork fills the bars instead.
+        // If no fill could be built at all (no frame and no artwork), leave the field uncovered so its Fluid
+        // artwork fills the bars instead of the plain base.
         _covers = [self addBlurredFill];
     }
     ready(self);
 }
 
-// A blurred, aspect-fill copy of the cover behind the fitted clip, so the bars are a soft continuation of it
-// rather than plain background. A still of the now-playing cover (the same picture the Fluid field blurs), not
-// a second video: heavily blurred, its motion would not read, and this adds no decode.
+// A blurred, aspect-fill copy of the clip behind the fitted clip, so the bars are a soft continuation of it
+// rather than plain background. A still of a clip frame (the now playing artwork only as a fallback, since it is
+// empty for a static cover played as a clip), not a second video: heavily blurred, its motion would not read.
 - (BOOL)addBlurredFill {
-    UIImage *fill = blurredFill(SGRNowPlayingArtwork(NULL, NULL));
+    BOOL fromClip = _coverImage != nil;
+    UIImage *fill = blurredFill(_coverImage ?: SGRNowPlayingArtwork(NULL, NULL));
+    say(@"blurred fill %@%@", fill ? @"built from " : @"not built: no source",
+        fill ? (fromClip ? @"the clip frame" : @"the now playing artwork") : @"");
     if (!fill) return NO;
     UIImageView *back = [[UIImageView alloc] initWithImage:fill];
     back.contentMode = UIViewContentModeScaleAspectFill;
