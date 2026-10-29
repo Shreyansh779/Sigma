@@ -23,6 +23,7 @@ static CFAbsoluteTime sg_spotifyInfoAt;
 static NSString *sg_shownLine;
 static BOOL sg_resending;
 static dispatch_source_t sg_timer;
+static CFAbsoluteTime sg_lastTick;   // reset on each start, so a pause is not logged as a late tick
 
 static NSString *textOf(NSArray<SGKaraokeWord *> *words) {
     SGKaraokeLine *line = [SGKaraokeLine new];
@@ -128,12 +129,12 @@ static void setTicking(BOOL on) {
     sg_timer = dispatch_source_create(DISPATCH_SOURCE_TYPE_TIMER, 0, DISPATCH_TIMER_STRICT, dispatch_get_main_queue());
     uint64_t every = (uint64_t)(kTick * NSEC_PER_SEC);
     dispatch_source_set_timer(sg_timer, dispatch_time(DISPATCH_TIME_NOW, every), every, 10 * NSEC_PER_MSEC);
+    sg_lastTick = 0;
     dispatch_source_set_event_handler(sg_timer, ^{
-        static CFAbsoluteTime last;
         static int late;
         CFAbsoluteTime now = CFAbsoluteTimeGetCurrent();
-        if (last && now - last > 2 && late++ < 5) SGLog(@"%s: ticked %.1f s late", __FILE_NAME__, now - last - kTick);
-        last = now;
+        if (sg_lastTick && now - sg_lastTick > 2 && late++ < 5) SGLog(@"%s: ticked %.1f s late", __FILE_NAME__, now - sg_lastTick - kTick);
+        sg_lastTick = now;
         tick();
     });
     dispatch_resume(sg_timer);
