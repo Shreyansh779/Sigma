@@ -6,11 +6,11 @@
 // The clip itself is fetched and cut Sigma's way (Shared/LockScreenArtwork/), Vitrine's follower deciding when.
 //
 // The system turns down a clip of another shape than its key's, and a preview still of another shape with
-// it, so a clip that does not fit (a Canvas is mostly 9:16) is letterboxed into the key's shape on black bars
-// (SGArtworkCrop), end to end rather than cut about its middle, and the still, taken from that fitted clip,
-// is the same shape as the video. The fitted clip, like the cover's clip, is made only when the lock screen
-// asks for the video, and kept: it by the clip and shape, the cover's clip by the picture the track names, so
-// an album's songs share one.
+// it, so a clip that does not fit (a Canvas is mostly 9:16) is centre-cropped to the key's shape
+// (SGArtworkCrop), filling it edge to edge with the excess cropped off, and the still, taken from that cropped
+// clip, is the same shape as the video. The cropped clip, like the cover's clip, is made only when the lock
+// screen asks for the video, and kept: it by the clip and shape, the cover's clip by the picture the track
+// names, so an album's songs share one.
 //
 // The choice is read on every track, and a change applies at once: Off takes the clip away, Moving artwork
 // and Every song look the playing track up. Lyrics is LyricsArtwork.x's, which reads it the same way, so the
