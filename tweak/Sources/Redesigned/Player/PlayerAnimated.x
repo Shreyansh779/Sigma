@@ -180,6 +180,7 @@ static void coverFrame(NSURL *file, void (^done)(UIImage *frame)) {
         if (!clip) return;
         clip->_coverImage = frame;
         clip->_frameTried = YES;
+        say(@"cover frame %@", frame ? [NSString stringWithFormat:@"%.0fx%.0f", frame.size.width, frame.size.height] : @"NIL (extraction failed)");
         [clip checkReady];
     });
     return self;
@@ -191,7 +192,10 @@ static void coverFrame(NSURL *file, void (^done)(UIImage *frame)) {
 
 - (void)checkReady {
     void (^ready)(SGRPlayerClip *) = _ready;
-    if (!ready || _light < 0 || !_frameTried || !_video.readyForDisplay) return;
+    if (!ready || _light < 0 || !_frameTried || !_video.readyForDisplay) {
+        if (ready) say(@"not ready: light %@, frameTried %d, display %d", _light < 0 ? @"unread" : @"ok", _frameTried, _video.readyForDisplay);
+        return;
+    }
     _ready = nil;
     // The item's presentation size is its displayed shape, rotation already applied. A Canvas, vertical (~9:16)
     // or landscape (~16:9), fills the player fullscreen, cropping the excess. Only a roughly portrait-to-square
@@ -199,7 +203,9 @@ static void coverFrame(NSURL *file, void (^done)(UIImage *frame)) {
     // drawn behind it so the bars read as a soft continuation of it. The fill it was made with stands until known.
     CGSize size = _player.currentItem.presentationSize;
     CGFloat ratio = size.width > 0 && size.height > 0 ? size.width / size.height : 0;
-    if (ratio >= 0.65 && ratio <= 1.2) {
+    BOOL fit = ratio >= 0.65 && ratio <= 1.2;
+    say(@"clip ready: presentation %.0fx%.0f ratio %.2f -> %@", size.width, size.height, ratio, fit ? @"FIT (blur fill)" : @"FILL (no bars)");
+    if (fit) {
         _video.videoGravity = AVLayerVideoGravityResizeAspect;
         // If no fill could be built at all (no frame and no artwork), leave the field uncovered so its Fluid
         // artwork fills the bars instead of the plain base.
