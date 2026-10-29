@@ -70,29 +70,11 @@ static void readLight(NSURL *file, void (^done)(float light)) {
     }
 }
 
-// A view backed by an AVPlayerLayer, so the layer tracks the view's bounds with no layout code of its own.
-@interface SGRClipVideo : UIView
-@end
-@implementation SGRClipVideo
-+ (Class)layerClass { return AVPlayerLayer.class; }
-@end
-
-// The clip's container: it keeps its subviews (the clip, and for an aspect-fit clip the blurred fill under it)
-// filling its bounds, and clips their overflow.
-@interface SGRClipContainer : UIView
-@end
-@implementation SGRClipContainer
-- (void)layoutSubviews {
-    [super layoutSubviews];
-    for (UIView *sub in self.subviews) sub.frame = self.bounds;
-}
-@end
-
 @interface SGRPlayerClip : NSObject
 @property (nonatomic, readonly) NSURL *file;
-@property (nonatomic, readonly) UIView *view;   // the clip, with a blurred fill behind it when it is fit
+@property (nonatomic, readonly) AVPlayerLayer *layer;
+@property (nonatomic, readonly) BOOL fills;     // lies opaque over the whole field; a fit cover does not, so the Fluid shows in its bars
 @property (nonatomic, readonly) float light;   // negative until read
-@property (nonatomic, readonly) BOOL drawable; // its first frame can be drawn
 // Once, on the main queue, when its first frame can be drawn and its light has been read.
 @property (nonatomic, copy) void (^ready)(SGRPlayerClip *clip);
 - (instancetype)initWithFile:(NSURL *)file;
@@ -103,10 +85,6 @@ static void readLight(NSURL *file, void (^done)(float light)) {
 @implementation SGRPlayerClip {
     AVQueuePlayer *_player;
     AVPlayerLooper *_looper;
-    SGRClipVideo *_front;          // the clip itself
-    AVPlayerLayer *_video;         // _front's layer
-    AVQueuePlayer *_fillPlayer;    // a second decode of the same clip, for the blurred fill (fit clips only)
-    AVPlayerLooper *_fillLooper;
     BOOL _observing;
 }
 
@@ -120,18 +98,13 @@ static void readLight(NSURL *file, void (^done)(float light)) {
     player.preventsDisplaySleepDuringVideoPlayback = NO;
     _looper = [AVPlayerLooper playerLooperWithPlayer:player templateItem:[AVPlayerItem playerItemWithURL:file]];
     _player = player;
-    _view = [[SGRClipContainer alloc] init];
-    _view.clipsToBounds = YES;
-    _view.userInteractionEnabled = NO;
-    _front = [[SGRClipVideo alloc] init];
-    _video = (AVPlayerLayer *)_front.layer;
-    _video.player = player;
+    _layer = [AVPlayerLayer playerLayerWithPlayer:player];
     // Set from the video's own shape once it can be drawn (checkReady): a vertical Canvas fills the player,
-    // anything wider or squarer (Apple Music's cover, a non-vertical Canvas) fits whole over a blurred fill of
-    // itself. Fill until then; corrected before the fade-in.
-    _video.videoGravity = AVLayerVideoGravityResizeAspectFill;
-    [_view addSubview:_front];
-    [_video addObserver:self forKeyPath:@"readyForDisplay" options:NSKeyValueObservingOptionInitial context:&kReadyContext];
+    // Apple Music's 4:3/square cover fits whole with no zoom. Fill until then; corrected before the fade-in.
+    _layer.videoGravity = AVLayerVideoGravityResizeAspectFill;
+    NSNull *off = NSNull.null;
+    _layer.actions = @{@"bounds": off, @"position": off, @"frame": off, @"opacity": off};
+    [_layer addObserver:self forKeyPath:@"readyForDisplay" options:NSKeyValueObservingOptionInitial context:&kReadyContext];
     _observing = YES;
     _light = -1;
     __weak SGRPlayerClip *weakSelf = self;
@@ -144,46 +117,19 @@ static void readLight(NSURL *file, void (^done)(float light)) {
     return self;
 }
 
-- (BOOL)drawable {
-    return _video.readyForDisplay;
-}
-
 - (void)checkReady {
     void (^ready)(SGRPlayerClip *) = _ready;
-    if (!ready || _light < 0 || !_video.readyForDisplay) return;
+    if (!ready || _light < 0 || !_layer.readyForDisplay) return;
     _ready = nil;
-    // The item's presentation size is its displayed shape, rotation already applied. A vertical clip (a
-    // Canvas, ~9:16) fills the player fullscreen; a wider or squarer one (Apple Music's cover, or a non-vertical
-    // Canvas) fits whole over a blurred fill of itself, so it is never zoomed or cropped. The fill it was made
-    // with stands until the shape is known.
+    // The item's presentation size is its displayed shape, rotation already applied. A Canvas, vertical (~9:16)
+    // or landscape (~16:9), fills the player fullscreen, cropping the excess. Only a roughly portrait-to-square
+    // clip (Apple Music's 3:4 or square cover) fits whole with no zoom, over the Fluid artwork that keeps drawing
+    // in the bars beside it. The fill it was made with stands until the shape is known.
     CGSize size = _player.currentItem.presentationSize;
-    if (size.width > 0 && size.height > 0 && size.width / size.height >= 0.65) {
-        _video.videoGravity = AVLayerVideoGravityResizeAspect;
-        [self addBlurredFill];
-    }
+    CGFloat ratio = size.width > 0 && size.height > 0 ? size.width / size.height : 0;
+    _fills = !(ratio >= 0.65 && ratio <= 1.2);
+    if (!_fills) _layer.videoGravity = AVLayerVideoGravityResizeAspect;
     ready(self);
-}
-
-// A second, aspect-fill copy of the clip behind the fitted one, blurred, so the leftover area reads as a soft
-// continuation of the video rather than plain player background. A second player because an AVPlayer drives
-// only one AVPlayerLayer at a time.
-- (void)addBlurredFill {
-    AVQueuePlayer *player = [AVQueuePlayer new];
-    player.muted = YES;
-    player.allowsExternalPlayback = NO;
-    player.preventsDisplaySleepDuringVideoPlayback = NO;
-    _fillLooper = [AVPlayerLooper playerLooperWithPlayer:player templateItem:[AVPlayerItem playerItemWithURL:_file]];
-    _fillPlayer = player;
-    SGRClipVideo *back = [[SGRClipVideo alloc] init];
-    AVPlayerLayer *fill = (AVPlayerLayer *)back.layer;
-    fill.player = player;
-    fill.videoGravity = AVLayerVideoGravityResizeAspectFill;
-    UIVisualEffectView *blur = [[UIVisualEffectView alloc] initWithEffect:[UIBlurEffect effectWithStyle:UIBlurEffectStyleSystemThickMaterialDark]];
-    blur.overrideUserInterfaceStyle = UIUserInterfaceStyleDark;   // the player is outside Spotify's nav stack
-    [_view insertSubview:back atIndex:0];
-    [_view insertSubview:blur aboveSubview:back];
-    if (_player.rate != 0) [player play];   // keep the fill in step with the clip's play/pause
-    [_view setNeedsLayout];
 }
 
 - (void)dealloc {
@@ -202,19 +148,15 @@ static void readLight(NSURL *file, void (^done)(float light)) {
 - (void)setPlaying:(BOOL)playing {
     if (playing && _player.rate == 0) [_player play];
     else if (!playing && _player.rate != 0) [_player pause];
-    if (playing && _fillPlayer.rate == 0) [_fillPlayer play];
-    else if (!playing && _fillPlayer.rate != 0) [_fillPlayer pause];
 }
 
 - (void)stop {
-    if (_observing) [_video removeObserver:self forKeyPath:@"readyForDisplay" context:&kReadyContext];
+    if (_observing) [_layer removeObserver:self forKeyPath:@"readyForDisplay" context:&kReadyContext];
     _observing = NO;
     _ready = nil;
     [_player pause];
     [_looper disableLooping];
-    [_fillPlayer pause];
-    [_fillLooper disableLooping];
-    [_view removeFromSuperview];
+    [_layer removeFromSuperlayer];
 }
 
 @end
@@ -238,7 +180,7 @@ static void readLight(NSURL *file, void (^done)(float light)) {
 @end
 
 @implementation SGRPlayerAnimatedView {
-    UIView *_clips;
+    CALayer *_clips;
     CAGradientLayer *_dim;
     CAGradientLayer *_shade;
     NSMutableArray<SGRPlayerClip *> *_leaving;   // under the one coming in until it is in
@@ -265,9 +207,9 @@ static float dimFor(float light) {
     NSDictionary *still = @{@"bounds": off, @"position": off, @"frame": off, @"opacity": off, @"sublayers": off};
     NSDictionary *stillGradient = @{@"bounds": off, @"position": off, @"frame": off, @"opacity": off, @"sublayers": off,
                                     @"colors": off, @"locations": off};
-    _clips = [UIView new];
-    _clips.userInteractionEnabled = NO;
-    [self addSubview:_clips];
+    _clips = [CALayer layer];
+    _clips.actions = still;
+    [self.layer addSublayer:_clips];
     _dim = [CAGradientLayer layer];
     _dim.actions = stillGradient;
     // Black at the top and from above the title down, clear over the cover between; its opacity scales all of it with how
@@ -303,8 +245,8 @@ static float dimFor(float light) {
     CGFloat topFade = MIN(kDimTop + kDimFade / height, kDimBottom);
     _dim.locations = @[@0, @(kDimTop), @(topFade), @(kDimBottom), @1];
     _shade.frame = bounds;
-    _clip.view.frame = bounds;
-    for (SGRPlayerClip *clip in _leaving) clip.view.frame = bounds;
+    _clip.layer.frame = bounds;
+    for (SGRPlayerClip *clip in _leaving) clip.layer.frame = bounds;
 }
 
 - (void)didMoveToWindow {
@@ -354,9 +296,9 @@ static void fade(CALayer *layer, float to, NSTimeInterval duration) {
     NSUInteger generation = ++_generation;
     if (_clip) [_leaving addObject:_clip];
     _clip = clip;
-    clip.view.frame = self.bounds;
-    clip.view.layer.opacity = 0;
-    [_clips addSubview:clip.view];
+    clip.layer.frame = self.bounds;
+    clip.layer.opacity = 0;
+    [_clips addSublayer:clip.layer];
     [clip setPlaying:_playing];
     __weak SGRPlayerAnimatedView *weakSelf = self;
     clip.ready = ^(SGRPlayerClip *ready) { [weakSelf fadeIn:ready generation:generation]; };
@@ -364,7 +306,7 @@ static void fade(CALayer *layer, float to, NSTimeInterval duration) {
         SGRPlayerAnimatedView *view = weakSelf;
         // A clip that has faded in was drawn; one still waiting while the app is away (Notification Center) is
         // not broken, it draws once the app is back.
-        if (!view || view.clip != clip || !clip.ready || clip.drawable) return;
+        if (!view || view.clip != clip || !clip.ready || clip.layer.readyForDisplay) return;
         if (UIApplication.sharedApplication.applicationState != UIApplicationStateActive) return;
         if (view.neverReady) view.neverReady(clip);
     });
@@ -383,17 +325,19 @@ static void fade(CALayer *layer, float to, NSTimeInterval duration) {
         SGRPlayerAnimatedView *view = weakSelf;
         if (!view || generation != view->_generation) return;
         [view dropLeaving];
-        [view setCovers:YES];
+        // A fit cover leaves bars: the Fluid artwork keeps drawing in them (its blurred cover colours, the way
+        // the lock screen shows them), so the field is only taken away when the clip fills the whole plane.
+        [view setCovers:clip.fills];
     }];
     _light = clip.light;
     fade(_dim, dimFor(_light), shownOpacity(self.layer) > 0.01f ? kFadeIn : 0);
     say(@"%@ fades in, its light %.2f dimmed by %.2f", clip.file.lastPathComponent, _light, dimFor(_light));
     // Over a clip still on screen the new one fades in on top of it; over the field the whole view does.
     if (_leaving.count && shownOpacity(self.layer) > 0.01f) {
-        clip.view.layer.opacity = 0;
-        fade(clip.view.layer, 1, kFadeIn);
+        clip.layer.opacity = 0;
+        fade(clip.layer, 1, kFadeIn);
     } else {
-        clip.view.layer.opacity = 1;
+        clip.layer.opacity = 1;
         [self dropLeaving];
     }
     [self fadeTo:YES duration:kFadeIn];
