@@ -2,10 +2,10 @@
 // Fluid artwork and under the rest of the player, found the way the lock screen finds its clip. Fluid
 // artwork shows until the clip can be drawn, for a track without one, and while the lyrics are up.
 #import <AVFoundation/AVFoundation.h>
+#import <CoreImage/CoreImage.h>
 #import "Core/SGCore.h"
 #import "Redesigned/Kit/SGRKit.h"
 #import "Shared/AnimatedArtwork/AnimatedArtwork.h"
-#import "Shared/AnimatedArtwork/SGFluidClip.h"
 #import "Player.h"
 
 static const NSTimeInterval kFadeIn = 0.6, kFadeOut = 0.45;
@@ -17,8 +17,9 @@ static const float kDimLeast = 0.1f, kDimMost = 0.8f;
 // The dim lies only where text does, as the Music app's does: a band at the top under the status bar and header, and
 // from above the title down, clear over the cover between (issue #101: over the whole clip it took up to four fifths of
 // its light). The top band is whole to this share of the view, gone kDimFade points below it; the bottom darkens from
-// kDimBottom down, where the shade starts.
-static const CGFloat kDimTop = 0.14f, kDimFade = 48.f, kDimBottom = 0.45f;
+// kDimBottom down, where the shade starts. Over a fit cover the top band is only the status bar's (kDimTopFit), as the
+// lock screen darkens it: the header there is the cover's own edge carried out (SGRClipFill), white for a white border.
+static const CGFloat kDimTop = 0.14f, kDimTopFit = 0.03f, kDimFade = 48.f, kDimBottom = 0.45f;
 static const float kShadeMiddle = 0.18f, kShadeBottom = 0.4f;
 static const NSTimeInterval kReadyWithin = 5;
 
@@ -89,12 +90,54 @@ static void readLight(NSURL *file, void (^done)(float light)) {
 }
 @end
 
-// One frame of the clip, read off the main thread for the fit cover's composed still (SGFluidClip); `done` on
-// the main queue, nil if none. Large enough that the cover stays sharp drawn near the plane's width.
+// The fill behind an aspect-fit clip: a frame of it laid where the fitted clip sits in `size`, its edges carried out
+// to the sides and blurred, so the bars continue the cover's own edge, as its border does on the lock screen (a white
+// border stays white, a dark edge stays dark). Drawn at half size, since the blur keeps no detail.
+static UIImage *continuedFill(UIImage *image, CGSize size) {
+    if (!image.CGImage || size.width < 1 || size.height < 1) return nil;
+    static CIContext *context;
+    static dispatch_once_t once;
+    dispatch_once(&once, ^{ context = [CIContext contextWithOptions:@{kCIContextWorkingColorSpace: (id)NSNull.null}]; });
+    CIImage *input = [CIImage imageWithCGImage:image.CGImage];
+    CGSize canvas = CGSizeMake(ceil(size.width / 2), ceil(size.height / 2)), picture = input.extent.size;
+    CGFloat scale = MIN(canvas.width / picture.width, canvas.height / picture.height);
+    CGAffineTransform place = CGAffineTransformMake(scale, 0, 0, scale, (canvas.width - picture.width * scale) / 2,
+                                                    (canvas.height - picture.height * scale) / 2);
+    CIFilter *blur = [CIFilter filterWithName:@"CIGaussianBlur"];
+    [blur setValue:[[input imageByApplyingTransform:place] imageByClampingToExtent] forKey:kCIInputImageKey];
+    [blur setValue:@(canvas.width * 0.08) forKey:kCIInputRadiusKey];
+    CGImageRef cg = [context createCGImage:blur.outputImage fromRect:(CGRect){CGPointZero, canvas}];
+    if (!cg) return nil;
+    UIImage *result = [UIImage imageWithCGImage:cg];
+    CGImageRelease(cg);
+    return result;
+}
+
+// continuedFill as a view, drawn again only when its size changes.
+@interface SGRClipFill : UIImageView
+@property (nonatomic, strong) UIImage *source;
+@end
+@implementation SGRClipFill {
+    CGSize _drawnFor;
+}
+- (void)layoutSubviews {
+    [super layoutSubviews];
+    CGSize size = self.bounds.size;
+    if (CGSizeEqualToSize(size, _drawnFor)) return;
+    UIImage *fill = continuedFill(self.source, size);
+    if (!fill) return;
+    _drawnFor = size;
+    self.image = fill;
+}
+@end
+
+// One frame of the clip, at a modest size, read off the main thread for the blurred fill; `done` on the main
+// queue, nil if none. The clip's own frame always exists and matches the cover, where the now playing artwork
+// may be empty for a static cover played as a clip.
 static void coverFrame(NSURL *file, void (^done)(UIImage *frame)) {
     AVAssetImageGenerator *generator = [AVAssetImageGenerator assetImageGeneratorWithAsset:[AVURLAsset URLAssetWithURL:file options:nil]];
     generator.appliesPreferredTrackTransform = YES;
-    generator.maximumSize = CGSizeMake(1200, 1200);
+    generator.maximumSize = CGSizeMake(320, 320);
     [generator generateCGImageAsynchronouslyForTime:CMTimeMakeWithSeconds(0, 600) completionHandler:^(CGImageRef frame, CMTime actual, NSError *error) {
         (void)generator;
         UIImage *image = frame ? [UIImage imageWithCGImage:frame] : nil;
@@ -104,10 +147,11 @@ static void coverFrame(NSURL *file, void (^done)(UIImage *frame)) {
 
 @interface SGRPlayerClip : NSObject
 @property (nonatomic, readonly) NSURL *file;
-@property (nonatomic, readonly) UIView *view;   // the moving clip, or for a fit cover the composed still that replaces it
-@property (nonatomic, readonly) BOOL covers;   // its view is opaque over the whole plane (a fullscreen Canvas, or a plane-sized still)
+@property (nonatomic, readonly) UIView *view;   // the clip, with a blurred fill of the cover behind it when it fits
+@property (nonatomic, readonly) BOOL covers;   // its view is opaque over the whole plane (a fill clip, or a fit clip with its blurred fill)
 @property (nonatomic, readonly) BOOL drawable; // its first frame can be drawn
 @property (nonatomic, readonly) float light;   // negative until read
+@property (nonatomic, readonly) BOOL fits;     // shown whole (aspect-fit) over its fill rather than filling the plane
 // Once, on the main queue, when its first frame can be drawn and its light has been read.
 @property (nonatomic, copy) void (^ready)(SGRPlayerClip *clip);
 - (instancetype)initWithFile:(NSURL *)file;
@@ -118,11 +162,10 @@ static void coverFrame(NSURL *file, void (^done)(UIImage *frame)) {
 @implementation SGRPlayerClip {
     AVQueuePlayer *_player;
     AVPlayerLooper *_looper;
-    SGRClipVideo *_front;   // the clip itself (removed for a fit cover, which is shown as a composed still)
+    SGRClipVideo *_front;   // the clip itself
     AVPlayerLayer *_video;  // _front's layer
-    UIImage *_coverImage;   // a frame of the clip, the cover for the fit case's composed still
+    UIImage *_coverImage;   // a frame of the clip, for the blurred fill
     BOOL _frameTried;       // the frame has been read (or failed)
-    BOOL _still;            // showing a composed still (a fit cover), not the video
     BOOL _observing;
 }
 
@@ -142,11 +185,14 @@ static void coverFrame(NSURL *file, void (^done)(UIImage *frame)) {
     _front = [[SGRClipVideo alloc] init];
     _video = (AVPlayerLayer *)_front.layer;
     _video.player = player;
-    // A Canvas fills the player fullscreen, cropping the excess, as a moving video. A roughly portrait-to-square
-    // cover (Apple Music's 3:4 or square) is shown the lock screen's way instead (checkReady): one still of the
-    // cover over a blurred fill of itself. Fill until the shape is known.
+    // Set from the video's own shape once it can be drawn (checkReady): a Canvas fills the player fullscreen,
+    // Apple Music's 3:4/square cover fits whole over a blurred fill of the cover. Fill until then.
     _video.videoGravity = AVLayerVideoGravityResizeAspectFill;
-    _covers = YES;   // the clip covers the plane either way (a fullscreen Canvas, or a plane-sized still)
+    // The aspect-fit letterbox must be clear, or the layer paints its bars with an opaque (light, in a light
+    // appearance) background over the blurred fill behind the clip, which is the whole point of the fill.
+    _front.opaque = NO;
+    _video.backgroundColor = UIColor.clearColor.CGColor;
+    _covers = YES;   // a fill clip covers the plane; a fit clip only if its blurred fill is built (checkReady)
     [_view addSubview:_front];
     [_video addObserver:self forKeyPath:@"readyForDisplay" options:NSKeyValueObservingOptionInitial context:&kReadyContext];
     _observing = YES;
@@ -163,7 +209,6 @@ static void coverFrame(NSURL *file, void (^done)(UIImage *frame)) {
         if (!clip) return;
         clip->_coverImage = frame;
         clip->_frameTried = YES;
-        say(@"cover frame %@", frame ? [NSString stringWithFormat:@"%.0fx%.0f", frame.size.width, frame.size.height] : @"NIL (extraction failed)");
         [clip checkReady];
     });
     return self;
@@ -175,68 +220,38 @@ static void coverFrame(NSURL *file, void (^done)(UIImage *frame)) {
 
 - (void)checkReady {
     void (^ready)(SGRPlayerClip *) = _ready;
-    if (!ready || _light < 0 || !_frameTried || !_video.readyForDisplay) {
-        if (ready) say(@"not ready: light %@, frameTried %d, display %d", _light < 0 ? @"unread" : @"ok", _frameTried, _video.readyForDisplay);
-        return;
-    }
+    if (!ready || _light < 0 || !_frameTried || !_video.readyForDisplay) return;
     _ready = nil;
     // The item's presentation size is its displayed shape, rotation already applied. A Canvas, vertical (~9:16)
-    // or landscape (~16:9), is a moving clip and fills the player fullscreen, cropping the excess. A roughly
-    // portrait-to-square clip (Apple Music's 3:4 or square cover) is shown the lock screen's way instead: one
-    // still of the cover over a blurred fill of itself (SGFluidClip), composed off the main thread.
+    // or landscape (~16:9), fills the player fullscreen, cropping the excess. Only a roughly portrait-to-square
+    // clip (Apple Music's 3:4 or square cover) fits whole with no zoom, and then the fill behind it carries the
+    // cover's own edge out to the bars (SGRClipFill). The fill it was made with stands until known.
     CGSize size = _player.currentItem.presentationSize;
     CGFloat ratio = size.width > 0 && size.height > 0 ? size.width / size.height : 0;
-    BOOL fit = ratio >= 0.65 && ratio <= 1.2;
-    say(@"clip ready: presentation %.0fx%.0f ratio %.2f -> %@", size.width, size.height, ratio, fit ? @"FIT (SGFluidClip still)" : @"FILL (moving video)");
-    if (fit) {
-        __weak SGRPlayerClip *weakSelf = self;
-        [self composeFluidStill:^{ ready(weakSelf); }];
-        return;
+    _fits = ratio >= 0.65 && ratio <= 1.2;
+    say(@"clip %.0fx%.0f (%.2f) %@", size.width, size.height, ratio, _fits ? @"fits whole over its edge carried out" : @"fills the plane");
+    if (_fits) {
+        _video.videoGravity = AVLayerVideoGravityResizeAspect;
+        // If no fill could be built at all (no frame and no artwork), leave the field uncovered so its Fluid
+        // artwork fills the bars instead of the plain base.
+        _covers = [self addBlurredFill];
     }
-    ready(self);   // a Canvas: the moving video, fullscreen
+    ready(self);
 }
 
-// The fit cover shown the lock screen's way (LockScreenMotion.x's showCover): one still composed by SGFluidClip
-// from a frame of the clip — the cover centred over a blurred fill of itself — in place of the video, so the
-// bars are a soft continuation of the cover with no AVPlayerLayer letterbox to composite over. `done` on main
-// once the still is in (or, failing that, once the video is set to zoom-fill instead).
-- (void)composeFluidStill:(void (^)(void))done {
-    UIImage *cover = _coverImage;
-    CGFloat scale = UIScreen.mainScreen.scale;
-    CGSize px = CGSizeMake(round(_view.bounds.size.width * scale), round(_view.bounds.size.height * scale));
-    if (!cover.CGImage || px.width < 1 || px.height < 1) {
-        // No frame to compose from: zoom-fill the clip so there are no empty bars, rather than fit with bars.
-        _video.videoGravity = AVLayerVideoGravityResizeAspectFill;
-        say(@"fit cover: no clip frame, the cover zoom-fills instead");
-        done();
-        return;
-    }
-    __weak SGRPlayerClip *weakSelf = self;
-    dispatch_async(dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0), ^{
-        CGImageRef frame = SGFluidClipFrame(cover.CGImage, px);
-        UIImage *image = frame ? [UIImage imageWithCGImage:frame] : nil;
-        if (frame) CGImageRelease(frame);
-        dispatch_async(dispatch_get_main_queue(), ^{
-            SGRPlayerClip *clip = weakSelf;
-            if (!clip) return;
-            if (image) {
-                clip->_still = YES;
-                [clip->_looper disableLooping];
-                [clip->_player pause];
-                [clip->_front removeFromSuperview];   // the cover is the composed still, not the video
-                UIImageView *view = [[UIImageView alloc] initWithImage:image];
-                view.contentMode = UIViewContentModeScaleAspectFill;
-                view.clipsToBounds = YES;
-                [clip->_view addSubview:view];
-                [clip->_view setNeedsLayout];
-            } else {
-                clip->_video.videoGravity = AVLayerVideoGravityResizeAspectFill;
-            }
-            say(@"fit cover: the composed still %@ (cover over a blurred fill, the lock screen's way)",
-                image ? @"is shown" : @"could not be made, the cover zoom-fills");
-            done();
-        });
-    });
+// The fill behind the fitted clip (SGRClipFill), so the bars continue the cover's own edge rather than show the plain
+// base. Made from a still of a clip frame (the now playing artwork only as a fallback, since it is empty for a static
+// cover played as a clip), not a second video: heavily blurred, its motion would not read.
+- (BOOL)addBlurredFill {
+    UIImage *source = _coverImage ?: SGRNowPlayingArtwork(NULL, NULL);
+    say(@"fill %@", !source.CGImage ? @"not built: no frame and no artwork"
+        : _coverImage ? @"from the clip frame" : @"from the now playing artwork");
+    if (!source.CGImage) return NO;
+    SGRClipFill *back = [SGRClipFill new];
+    back.source = source;
+    [_view insertSubview:back atIndex:0];
+    [_view setNeedsLayout];
+    return YES;
 }
 
 - (void)dealloc {
@@ -253,7 +268,6 @@ static void coverFrame(NSURL *file, void (^done)(UIImage *frame)) {
 }
 
 - (void)setPlaying:(BOOL)playing {
-    if (_still) return;   // a composed still has no video to play
     if (playing && _player.rate == 0) [_player play];
     else if (!playing && _player.rate != 0) [_player pause];
 }
@@ -294,6 +308,7 @@ static void coverFrame(NSURL *file, void (^done)(UIImage *frame)) {
     NSMutableArray<SGRPlayerClip *> *_leaving;   // under the one coming in until it is in
     BOOL _playing;
     float _light;   // the shown clip's
+    BOOL _fitCover;   // the shown clip fits whole, so the top band is only the status bar's
     NSUInteger _generation;
 }
 
@@ -348,10 +363,11 @@ static float dimFor(float light) {
     CGRect bounds = self.bounds;
     _clips.frame = bounds;
     _dim.frame = bounds;
-    // The top band is whole to kDimTop of the view and gone kDimFade points below it; the bottom goes dark from kDimBottom.
-    CGFloat height = MAX(1, bounds.size.height);
-    CGFloat topFade = MIN(kDimTop + kDimFade / height, kDimBottom);
-    _dim.locations = @[@0, @(kDimTop), @(topFade), @(kDimBottom), @1];
+    // The top band is whole to kDimTop of the view (kDimTopFit over a fit cover) and gone kDimFade points below it; the
+    // bottom goes dark from kDimBottom.
+    CGFloat height = MAX(1, bounds.size.height), top = _fitCover ? kDimTopFit : kDimTop;
+    CGFloat topFade = MIN(top + kDimFade / height, kDimBottom);
+    _dim.locations = @[@0, @(top), @(topFade), @(kDimBottom), @1];
     _shade.frame = bounds;
     _clip.view.frame = bounds;
     for (SGRPlayerClip *clip in _leaving) clip.view.frame = bounds;
@@ -438,6 +454,8 @@ static void fade(CALayer *layer, float to, NSTimeInterval duration) {
         [view setCovers:clip.covers];
     }];
     _light = clip.light;
+    _fitCover = clip.fits;
+    [self setNeedsLayout];
     fade(_dim, dimFor(_light), shownOpacity(self.layer) > 0.01f ? kFadeIn : 0);
     say(@"%@ fades in, its light %.2f dimmed by %.2f", clip.file.lastPathComponent, _light, dimFor(_light));
     // Over a clip still on screen the new one fades in on top of it; over the field the whole view does.
