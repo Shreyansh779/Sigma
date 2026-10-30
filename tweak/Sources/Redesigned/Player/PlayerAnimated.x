@@ -72,11 +72,37 @@ static void readLight(NSURL *file, void (^done)(float light)) {
     }
 }
 
-// A view backed by an AVPlayerLayer, so the layer tracks the view's bounds with no layout code of its own.
+// A view backed by an AVPlayerLayer, so the layer tracks the view's bounds with no layout code of its own. A fit
+// clip of shape `aspect` (width / height) has its top and bottom edges faded out over kFeather of its height, so it
+// runs into the fill carrying its edge out (SGRClipFill) with no line between the sharp picture and the blur.
 @interface SGRClipVideo : UIView
+@property (nonatomic) CGFloat aspect;
 @end
 @implementation SGRClipVideo
+static const CGFloat kFeather = 0.08f;
 + (Class)layerClass { return AVPlayerLayer.class; }
+- (void)layoutSubviews {
+    [super layoutSubviews];
+    CGSize bounds = self.bounds.size;
+    if (_aspect <= 0 || bounds.width < 1 || bounds.height < 1) {
+        self.layer.mask = nil;
+        return;
+    }
+    CGFloat height = MIN(bounds.height, bounds.width / _aspect), top = (bounds.height - height) / 2, feather = height * kFeather;
+    CAGradientLayer *mask = [self.layer.mask isKindOfClass:CAGradientLayer.class] ? (CAGradientLayer *)self.layer.mask : nil;
+    [CATransaction begin];
+    [CATransaction setDisableActions:YES];
+    if (!mask) {
+        mask = [CAGradientLayer layer];
+        id clear = (id)UIColor.clearColor.CGColor, solid = (id)UIColor.blackColor.CGColor;
+        mask.colors = @[clear, clear, solid, solid, clear, clear];
+        self.layer.mask = mask;
+    }
+    mask.frame = self.bounds;
+    CGFloat h = bounds.height;
+    mask.locations = @[@0, @(top / h), @((top + feather) / h), @((top + height - feather) / h), @((top + height) / h), @1];
+    [CATransaction commit];
+}
 @end
 
 // The clip's container: it keeps its subviews (the clip, and for an aspect-fit clip the blurred fill under it)
@@ -295,6 +321,8 @@ static void coverFrame(NSURL *file, void (^done)(UIImage *frame)) {
     say(@"clip %.0fx%.0f (%.2f) %@", size.width, size.height, ratio, _fits ? @"fits whole over its edge carried out" : @"fills the plane");
     if (_fits) {
         _video.videoGravity = AVLayerVideoGravityResizeAspect;
+        _front.aspect = ratio;
+        [_front setNeedsLayout];
         // If no fill could be built at all (no frame and no artwork), leave the field uncovered so its Fluid
         // artwork fills the bars instead of the plain base.
         _covers = [self addBlurredFill];
