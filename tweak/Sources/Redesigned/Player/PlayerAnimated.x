@@ -72,9 +72,17 @@ static void readLight(NSURL *file, void (^done)(float light)) {
     }
 }
 
+// Where a fit clip of shape `aspect` (width / height) sits in `bounds`: whole, centred across, its top kFitTop of
+// the way down (as high as it must be to end on screen), so it ends behind the title rather than under the controls.
+static const CGFloat kFitTop = 0.15f;
+static CGRect fitted(CGSize bounds, CGFloat aspect) {
+    CGFloat width = MIN(bounds.width, bounds.height * aspect), height = width / aspect;
+    return CGRectMake((bounds.width - width) / 2, MAX(0, MIN(bounds.height * kFitTop, bounds.height - height)), width, height);
+}
+
 // A view backed by an AVPlayerLayer, so the layer tracks the view's bounds with no layout code of its own. A fit
-// clip of shape `aspect` (width / height) has its top and bottom edges faded out over kFeather of its height, so it
-// runs into the fill carrying its edge out (SGRClipFill) with no line between the sharp picture and the blur.
+// clip (`aspect` set, its width / height) is laid at `fitted` with its top and bottom edges faded out over kFeather
+// of its height, so it runs into the fill carrying its edge out (SGRClipFill) with no line between picture and blur.
 @interface SGRClipVideo : UIView
 @property (nonatomic) CGFloat aspect;
 @end
@@ -83,40 +91,40 @@ static const CGFloat kFeather = 0.08f;
 + (Class)layerClass { return AVPlayerLayer.class; }
 - (void)layoutSubviews {
     [super layoutSubviews];
-    CGSize bounds = self.bounds.size;
-    if (_aspect <= 0 || bounds.width < 1 || bounds.height < 1) {
+    if (_aspect <= 0) {
         self.layer.mask = nil;
         return;
     }
-    CGFloat height = MIN(bounds.height, bounds.width / _aspect), top = (bounds.height - height) / 2, feather = height * kFeather;
     CAGradientLayer *mask = [self.layer.mask isKindOfClass:CAGradientLayer.class] ? (CAGradientLayer *)self.layer.mask : nil;
     [CATransaction begin];
     [CATransaction setDisableActions:YES];
     if (!mask) {
         mask = [CAGradientLayer layer];
         id clear = (id)UIColor.clearColor.CGColor, solid = (id)UIColor.blackColor.CGColor;
-        mask.colors = @[clear, clear, solid, solid, clear, clear];
+        mask.colors = @[clear, solid, solid, clear];
+        mask.locations = @[@0, @(kFeather), @(1 - kFeather), @1];
         self.layer.mask = mask;
     }
     mask.frame = self.bounds;
-    CGFloat h = bounds.height;
-    mask.locations = @[@0, @(top / h), @((top + feather) / h), @((top + height - feather) / h), @((top + height) / h), @1];
     [CATransaction commit];
 }
 @end
 
 // The clip's container: it keeps its subviews (the clip, and for an aspect-fit clip the blurred fill under it)
-// filling its bounds, and clips their overflow.
+// filling its bounds, a fit clip at `fitted`, and clips their overflow.
 @interface SGRClipContainer : UIView
 @end
 @implementation SGRClipContainer
 - (void)layoutSubviews {
     [super layoutSubviews];
-    for (UIView *sub in self.subviews) sub.frame = self.bounds;
+    for (UIView *sub in self.subviews) {
+        CGFloat aspect = [sub isKindOfClass:SGRClipVideo.class] ? ((SGRClipVideo *)sub).aspect : 0;
+        sub.frame = aspect > 0 ? fitted(self.bounds.size, aspect) : self.bounds;
+    }
 }
 @end
 
-// The fill behind an aspect-fit clip: a frame of it laid where the fitted clip sits in `size`, its edges carried out
+// The fill behind an aspect-fit clip: a frame of it laid where the fitted clip sits in `size` (`fitted`), its edges carried out
 // to the sides and blurred, so the bars continue the cover's own edge, as its border does on the lock screen (a white
 // border stays white, a dark edge stays dark). Drawn at half size, since the blur keeps no detail.
 static UIImage *continuedFill(UIImage *image, CGSize size) {
@@ -126,9 +134,10 @@ static UIImage *continuedFill(UIImage *image, CGSize size) {
     dispatch_once(&once, ^{ context = [CIContext contextWithOptions:@{kCIContextWorkingColorSpace: (id)NSNull.null}]; });
     CIImage *input = [CIImage imageWithCGImage:image.CGImage];
     CGSize canvas = CGSizeMake(ceil(size.width / 2), ceil(size.height / 2)), picture = input.extent.size;
-    CGFloat scale = MIN(canvas.width / picture.width, canvas.height / picture.height);
-    CGRect placed = CGRectMake((canvas.width - picture.width * scale) / 2, (canvas.height - picture.height * scale) / 2,
-                               picture.width * scale, picture.height * scale);
+    // Where the clip sits (`fitted`), turned over for Core Image, whose origin is at the bottom.
+    CGRect placed = fitted(canvas, picture.width / picture.height);
+    placed.origin.y = canvas.height - CGRectGetMaxY(placed);
+    CGFloat scale = placed.size.width / picture.width;
     CGAffineTransform place = CGAffineTransformMake(scale, 0, 0, scale, placed.origin.x, placed.origin.y);
     // Carried out from a little inside the edge: a frame's outermost pixels can be a dark line (from scaling, or a video
     // cut from its encoded size), and stretched out it would paint the bars that line's colour, not the cover's edge.
@@ -322,7 +331,7 @@ static void coverFrame(NSURL *file, void (^done)(UIImage *frame)) {
     if (_fits) {
         _video.videoGravity = AVLayerVideoGravityResizeAspect;
         _front.aspect = ratio;
-        [_front setNeedsLayout];
+        [_view setNeedsLayout];
         // If no fill could be built at all (no frame and no artwork), leave the field uncovered so its Fluid
         // artwork fills the bars instead of the plain base.
         _covers = [self addBlurredFill];
