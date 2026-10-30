@@ -286,6 +286,9 @@ static void coverFrame(NSURL *file, void (^done)(UIImage *frame)) {
     // clip (Apple Music's 3:4 or square cover) fits whole with no zoom, and then the fill behind it carries the
     // cover's own edge out to the bars (SGRClipFill). The fill it was made with stands until known.
     CGSize size = _player.currentItem.presentationSize;
+    // On a cold start the item can still say 0x0 here, and a fit cover was then shown zoomed as a Canvas until the
+    // next time it came in. The frame read from the file has the same shape.
+    if ((size.width <= 0 || size.height <= 0) && _coverImage) size = _coverImage.size;
     CGFloat ratio = size.width > 0 && size.height > 0 ? size.width / size.height : 0;
     _fits = ratio >= 0.65 && ratio <= 1.2;
     say(@"clip %.0fx%.0f (%.2f) %@", size.width, size.height, ratio, _fits ? @"fits whole over its edge carried out" : @"fills the plane");
