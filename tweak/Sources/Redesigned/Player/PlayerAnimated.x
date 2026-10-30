@@ -101,10 +101,17 @@ static UIImage *continuedFill(UIImage *image, CGSize size) {
     CIImage *input = [CIImage imageWithCGImage:image.CGImage];
     CGSize canvas = CGSizeMake(ceil(size.width / 2), ceil(size.height / 2)), picture = input.extent.size;
     CGFloat scale = MIN(canvas.width / picture.width, canvas.height / picture.height);
-    CGAffineTransform place = CGAffineTransformMake(scale, 0, 0, scale, (canvas.width - picture.width * scale) / 2,
-                                                    (canvas.height - picture.height * scale) / 2);
+    CGRect placed = CGRectMake((canvas.width - picture.width * scale) / 2, (canvas.height - picture.height * scale) / 2,
+                               picture.width * scale, picture.height * scale);
+    CGAffineTransform place = CGAffineTransformMake(scale, 0, 0, scale, placed.origin.x, placed.origin.y);
+    // Carried out from a little inside the edge: a frame's outermost pixels can be a dark line (from scaling, or a video
+    // cut from its encoded size), and stretched out it would paint the bars that line's colour, not the cover's edge.
+    // What lies between is behind the clip.
+    CGFloat inset = MAX(2, round(MIN(placed.size.width, placed.size.height) * 0.02));
+    CIImage *edge = [[[input imageByApplyingTransform:place] imageByCroppingToRect:CGRectInset(placed, inset, inset)]
+                     imageByClampingToExtent];
     CIFilter *blur = [CIFilter filterWithName:@"CIGaussianBlur"];
-    [blur setValue:[[input imageByApplyingTransform:place] imageByClampingToExtent] forKey:kCIInputImageKey];
+    [blur setValue:edge forKey:kCIInputImageKey];
     [blur setValue:@(canvas.width * 0.08) forKey:kCIInputRadiusKey];
     CGImageRef cg = [context createCGImage:blur.outputImage fromRect:(CGRect){CGPointZero, canvas}];
     if (!cg) return nil;
