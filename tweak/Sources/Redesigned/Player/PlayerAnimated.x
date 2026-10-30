@@ -143,18 +143,65 @@ static UIImage *continuedFill(UIImage *image, CGSize size) {
 }
 @end
 
-// One frame of the clip, at a modest size, read off the main thread for the blurred fill; `done` on the main
-// queue, nil if none. The clip's own frame always exists and matches the cover, where the now playing artwork
-// may be empty for a static cover played as a clip.
+// The average colour of a band just inside `image`'s top edge, as #rrggbb, for the log.
+static NSString *topEdgeOf(CGImageRef image) {
+    if (!image) return @"none";
+    size_t width = CGImageGetWidth(image), height = CGImageGetHeight(image);
+    CGImageRef band = CGImageCreateWithImageInRect(image, CGRectMake(0, round(height * 0.02), width, MAX(1, round(height * 0.03))));
+    uint8_t px[4] = {0};
+    CGColorSpaceRef space = CGColorSpaceCreateWithName(kCGColorSpaceSRGB);
+    CGContextRef context = CGBitmapContextCreate(px, 1, 1, 8, 4, space, (CGBitmapInfo)kCGImageAlphaNoneSkipLast);
+    CGColorSpaceRelease(space);
+    if (context && band) CGContextDrawImage(context, CGRectMake(0, 0, 1, 1), band);
+    CGContextRelease(context);
+    if (band) CGImageRelease(band);
+    return [NSString stringWithFormat:@"#%02x%02x%02x", px[0], px[1], px[2]];
+}
+
+// The fill's pictures, kept in Documents/Sigma (which the Files app shows) while the fill is checked against the
+// screen.
+static void keepPicture(UIImage *image, NSString *name) {
+    if (!image) return;
+    NSString *folder = [NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES).firstObject
+                        stringByAppendingPathComponent:@"Sigma"];
+    [UIImagePNGRepresentation(image) writeToFile:[folder stringByAppendingPathComponent:name] atomically:YES];
+}
+
+// One frame of the clip, at a modest size, read off the main thread for the fill; `done` on the main queue, nil if
+// none. The clip's own frame always exists and matches the cover, where the now playing artwork may be empty for a
+// static cover played as a clip. A second in, at that exact time, rather than its opening frame: the fill made from
+// the opening frame painted the bars dark teal under a white-bordered cover. The opening frame stands in should
+// the clip be shorter; both are logged and kept.
 static void coverFrame(NSURL *file, void (^done)(UIImage *frame)) {
     AVAssetImageGenerator *generator = [AVAssetImageGenerator assetImageGeneratorWithAsset:[AVURLAsset URLAssetWithURL:file options:nil]];
     generator.appliesPreferredTrackTransform = YES;
     generator.maximumSize = CGSizeMake(320, 320);
-    [generator generateCGImageAsynchronouslyForTime:CMTimeMakeWithSeconds(0, 600) completionHandler:^(CGImageRef frame, CMTime actual, NSError *error) {
-        (void)generator;
-        UIImage *image = frame ? [UIImage imageWithCGImage:frame] : nil;
-        dispatch_async(dispatch_get_main_queue(), ^{ done(image); });
-    }];
+    generator.requestedTimeToleranceBefore = kCMTimeZero;
+    generator.requestedTimeToleranceAfter = kCMTimeZero;
+    __block UIImage *opening, *later;
+    __block NSString *openingEdge = @"none", *laterEdge = @"none";
+    __block NSUInteger pending = 2;
+    for (NSNumber *second in @[@0, @1]) {
+        [generator generateCGImageAsynchronouslyForTime:CMTimeMakeWithSeconds(second.doubleValue, 600) completionHandler:^(CGImageRef frame, CMTime actual, NSError *error) {
+            (void)generator;
+            UIImage *image = frame ? [UIImage imageWithCGImage:frame] : nil;
+            NSString *edge = topEdgeOf(frame);
+            dispatch_async(dispatch_get_main_queue(), ^{
+                if (second.intValue) {
+                    later = image;
+                    laterEdge = edge;
+                } else {
+                    opening = image;
+                    openingEdge = edge;
+                }
+                if (--pending) return;
+                say(@"clip frame top edge: at 0 s %@, at 1 s %@", openingEdge, laterEdge);
+                keepPicture(opening, @"fill-frame-0s.png");
+                keepPicture(later, @"fill-frame-1s.png");
+                done(later ?: opening);
+            });
+        }];
+    }
 }
 
 @interface SGRPlayerClip : NSObject
@@ -267,8 +314,9 @@ static void coverFrame(NSURL *file, void (^done)(UIImage *frame)) {
     BOOL drawn = [back drawFor:size];
     [_view insertSubview:back atIndex:0];
     [_view setNeedsLayout];
-    say(@"fill from %@, %@ at %.0fx%.0f", _coverImage ? @"the clip frame" : @"the now playing artwork",
-        drawn ? @"drawn" : @"not drawn yet", size.width, size.height);
+    keepPicture(back.image, @"fill.png");
+    say(@"fill from %@, %@ at %.0fx%.0f, its top %@", _coverImage ? @"the clip frame" : @"the now playing artwork",
+        drawn ? @"drawn" : @"not drawn yet", size.width, size.height, topEdgeOf(back.image.CGImage));
     return YES;
 }
 
