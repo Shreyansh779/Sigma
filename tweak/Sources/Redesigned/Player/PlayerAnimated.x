@@ -106,10 +106,11 @@ static UIImage *continuedFill(UIImage *image, CGSize size) {
     CGAffineTransform place = CGAffineTransformMake(scale, 0, 0, scale, placed.origin.x, placed.origin.y);
     // Carried out from a little inside the edge: a frame's outermost pixels can be a dark line (from scaling, or a video
     // cut from its encoded size), and stretched out it would paint the bars that line's colour, not the cover's edge.
-    // What lies between is behind the clip.
-    CGFloat inset = MAX(2, round(MIN(placed.size.width, placed.size.height) * 0.02));
-    CIImage *edge = [[[input imageByApplyingTransform:place] imageByCroppingToRect:CGRectInset(placed, inset, inset)]
-                     imageByClampingToExtent];
+    // What lies between is behind the clip. Clamped before it is scaled: a scaled-down frame's border is see-through,
+    // and carried out it left the bars nearly clear (white at 6% over the field read as the field's dark).
+    CGFloat inset = MAX(2, round(MIN(picture.width, picture.height) * 0.02));
+    CIImage *edge = [[[input imageByCroppingToRect:CGRectInset(input.extent, inset, inset)] imageByClampingToExtent]
+                     imageByApplyingTransform:place];
     CIFilter *blur = [CIFilter filterWithName:@"CIGaussianBlur"];
     [blur setValue:edge forKey:kCIInputImageKey];
     [blur setValue:@(canvas.width * 0.08) forKey:kCIInputRadiusKey];
