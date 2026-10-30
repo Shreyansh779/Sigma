@@ -17,9 +17,9 @@ static const float kDimLeast = 0.1f, kDimMost = 0.8f;
 // The dim lies only where text does, as the Music app's does: a band at the top under the status bar and header, and
 // from above the title down, clear over the cover between (issue #101: over the whole clip it took up to four fifths of
 // its light). The top band is whole to this share of the view, gone kDimFade points below it; the bottom darkens from
-// kDimBottom down, where the shade starts. Over a fit cover the top band is only the status bar's (kDimTopFit), as the
-// lock screen darkens it: the header there is the cover's own edge carried out (SGRClipFill), white for a white border.
-static const CGFloat kDimTop = 0.14f, kDimTopFit = 0.03f, kDimFade = 48.f, kDimBottom = 0.45f;
+// kDimBottom down, where the shade starts. A fit cover has neither dim nor shade: it is shown as the lock screen shows
+// it, the cover and its own edge carried out (SGRClipFill), and whether the controls read over it is judged by eye.
+static const CGFloat kDimTop = 0.14f, kDimFade = 48.f, kDimBottom = 0.45f;
 static const float kShadeMiddle = 0.18f, kShadeBottom = 0.4f;
 static const NSTimeInterval kReadyWithin = 5;
 
@@ -113,21 +113,26 @@ static UIImage *continuedFill(UIImage *image, CGSize size) {
     return result;
 }
 
-// continuedFill as a view, drawn again only when its size changes.
+// continuedFill as a view: drawn for the size it is given when it is made, and again should its size change.
 @interface SGRClipFill : UIImageView
 @property (nonatomic, strong) UIImage *source;
+- (BOOL)drawFor:(CGSize)size;
 @end
 @implementation SGRClipFill {
     CGSize _drawnFor;
 }
-- (void)layoutSubviews {
-    [super layoutSubviews];
-    CGSize size = self.bounds.size;
-    if (CGSizeEqualToSize(size, _drawnFor)) return;
+- (BOOL)drawFor:(CGSize)size {
+    if (size.width < 1 || size.height < 1) return NO;
+    if (CGSizeEqualToSize(size, _drawnFor)) return YES;
     UIImage *fill = continuedFill(self.source, size);
-    if (!fill) return;
+    if (!fill) return NO;
     _drawnFor = size;
     self.image = fill;
+    return YES;
+}
+- (void)layoutSubviews {
+    [super layoutSubviews];
+    [self drawFor:self.bounds.size];
 }
 @end
 
@@ -244,13 +249,19 @@ static void coverFrame(NSURL *file, void (^done)(UIImage *frame)) {
 // cover played as a clip), not a second video: heavily blurred, its motion would not read.
 - (BOOL)addBlurredFill {
     UIImage *source = _coverImage ?: SGRNowPlayingArtwork(NULL, NULL);
-    say(@"fill %@", !source.CGImage ? @"not built: no frame and no artwork"
-        : _coverImage ? @"from the clip frame" : @"from the now playing artwork");
-    if (!source.CGImage) return NO;
-    SGRClipFill *back = [SGRClipFill new];
+    if (!source.CGImage) {
+        say(@"fill not built: no frame and no artwork");
+        return NO;
+    }
+    // Drawn now, at the plane's size (showClip has sized the view), rather than left to a layout pass.
+    CGSize size = _view.bounds.size;
+    SGRClipFill *back = [[SGRClipFill alloc] initWithFrame:_view.bounds];
     back.source = source;
+    BOOL drawn = [back drawFor:size];
     [_view insertSubview:back atIndex:0];
     [_view setNeedsLayout];
+    say(@"fill from %@, %@ at %.0fx%.0f", _coverImage ? @"the clip frame" : @"the now playing artwork",
+        drawn ? @"drawn" : @"not drawn yet", size.width, size.height);
     return YES;
 }
 
@@ -308,7 +319,6 @@ static void coverFrame(NSURL *file, void (^done)(UIImage *frame)) {
     NSMutableArray<SGRPlayerClip *> *_leaving;   // under the one coming in until it is in
     BOOL _playing;
     float _light;   // the shown clip's
-    BOOL _fitCover;   // the shown clip fits whole, so the top band is only the status bar's
     NSUInteger _generation;
 }
 
@@ -363,11 +373,10 @@ static float dimFor(float light) {
     CGRect bounds = self.bounds;
     _clips.frame = bounds;
     _dim.frame = bounds;
-    // The top band is whole to kDimTop of the view (kDimTopFit over a fit cover) and gone kDimFade points below it; the
-    // bottom goes dark from kDimBottom.
-    CGFloat height = MAX(1, bounds.size.height), top = _fitCover ? kDimTopFit : kDimTop;
-    CGFloat topFade = MIN(top + kDimFade / height, kDimBottom);
-    _dim.locations = @[@0, @(top), @(topFade), @(kDimBottom), @1];
+    // The top band is whole to kDimTop of the view and gone kDimFade points below it; the bottom goes dark from kDimBottom.
+    CGFloat height = MAX(1, bounds.size.height);
+    CGFloat topFade = MIN(kDimTop + kDimFade / height, kDimBottom);
+    _dim.locations = @[@0, @(kDimTop), @(topFade), @(kDimBottom), @1];
     _shade.frame = bounds;
     _clip.view.frame = bounds;
     for (SGRPlayerClip *clip in _leaving) clip.view.frame = bounds;
@@ -454,10 +463,13 @@ static void fade(CALayer *layer, float to, NSTimeInterval duration) {
         [view setCovers:clip.covers];
     }];
     _light = clip.light;
-    _fitCover = clip.fits;
-    [self setNeedsLayout];
-    fade(_dim, dimFor(_light), shownOpacity(self.layer) > 0.01f ? kFadeIn : 0);
-    say(@"%@ fades in, its light %.2f dimmed by %.2f", clip.file.lastPathComponent, _light, dimFor(_light));
+    // A fit cover goes without the dim and the shade, as the lock screen shows it (kDimBottom's note).
+    float dim = clip.fits ? 0 : dimFor(_light);
+    NSTimeInterval duration = shownOpacity(self.layer) > 0.01f ? kFadeIn : 0;
+    fade(_dim, dim, duration);
+    fade(_shade, clip.fits ? 0 : 1, duration);
+    say(@"%@ fades in, its light %.2f dimmed by %.2f%@", clip.file.lastPathComponent, _light, dim,
+        clip.fits ? @", no dim or shade (a fit cover)" : @"");
     // Over a clip still on screen the new one fades in on top of it; over the field the whole view does.
     if (_leaving.count && shownOpacity(self.layer) > 0.01f) {
         clip.view.layer.opacity = 0;
