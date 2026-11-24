@@ -51,8 +51,32 @@ jobs:
           mkdir -p ipa
           URL="${INPUT_URL:-$SECRET_URL}"
           [ -n "$URL" ] || { echo "::error::No ipa_url given and no IPA_URL secret set"; exit 1; }
-          curl -fsSL "$URL" -o ipa/spotify.ipa
-          case "$(file --mime-type -b ipa/spotify.ipa)" in application/zip|application/x-ios-app) ;; *) echo "::error::Not an IPA"; exit 1 ;; esac
+
+          echo "Downloading IPA..."
+          if ! curl -fsSL -w "\n%{http_code}" "$URL" -o ipa/spotify.ipa.tmp > /tmp/curl_output.txt 2>&1; then
+            echo "::error::Download failed"
+            cat /tmp/curl_output.txt
+            exit 1
+          fi
+
+          HTTP_CODE=$(tail -n 1 /tmp/curl_output.txt)
+          if [ "$HTTP_CODE" != "200" ]; then
+            echo "::error::HTTP $HTTP_CODE - check URL is accessible"
+            exit 1
+          fi
+
+          FILE_SIZE=$(stat -f%z ipa/spotify.ipa.tmp 2>/dev/null || stat -c%s ipa/spotify.ipa.tmp 2>/dev/null)
+          if [ "$FILE_SIZE" -lt 1000000 ]; then
+            echo "::error::Downloaded file too small ($FILE_SIZE bytes) - likely not a valid IPA"
+            exit 1
+          fi
+
+          MIME=$(file --mime-type -b ipa/spotify.ipa.tmp)
+          echo "File MIME type: $MIME, Size: $FILE_SIZE bytes"
+          case "$MIME" in
+            application/zip|application/x-ios-app) mv ipa/spotify.ipa.tmp ipa/spotify.ipa ;;
+            *) echo "::error::Not an IPA (MIME: $MIME)"; exit 1 ;;
+          esac
 
       - name: Build
         run: |
